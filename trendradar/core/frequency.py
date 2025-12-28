@@ -8,6 +8,7 @@
 - 过滤词（!前缀）
 - 全局过滤词（[GLOBAL_FILTER] 区域）
 - 最大显示数量（@前缀）
+- 自定义主题名称（#名称，作为词组第一行）
 """
 
 import os
@@ -31,6 +32,7 @@ def load_frequency_words(
     - +词：必须词，所有必须词都要匹配
     - !词：过滤词，匹配则排除
     - @数字：该词组最多显示的条数
+    - #名称：自定义主题名称（必须作为词组第一行）
 
     Args:
         frequency_file: 频率词配置文件路径，默认从环境变量 FREQUENCY_WORDS_PATH 获取或使用 config/frequency_words.txt
@@ -93,9 +95,13 @@ def load_frequency_words(
         group_normal_words = []
         group_filter_words = []
         group_max_count = 0  # 默认不限制
+        group_name = None  # 自定义主题名称
 
         for word in words:
-            if word.startswith("@"):
+            if word.startswith("#"):
+                # 自定义主题名称
+                group_name = word[1:].strip()
+            elif word.startswith("@"):
                 # 解析最大显示数量（只接受正整数）
                 try:
                     count = int(word[1:])
@@ -112,10 +118,13 @@ def load_frequency_words(
                 group_normal_words.append(word)
 
         if group_required_words or group_normal_words:
-            if group_normal_words:
-                group_key = " ".join(group_normal_words)
+            # 如果没有自定义名称，使用第一个关键词作为名称
+            if group_name:
+                group_key = group_name
+            elif group_normal_words:
+                group_key = group_normal_words[0]
             else:
-                group_key = " ".join(group_required_words)
+                group_key = group_required_words[0]
 
             processed_groups.append(
                 {

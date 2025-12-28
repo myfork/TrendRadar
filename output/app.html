@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TrendRadar - 热点新闻聚合</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        :root { --bg-primary: #0f0f23; --bg-secondary: #1a1a2e; --bg-card: #16213e; --text-primary: #e4e4e7; --text-secondary: #a1a1aa; --accent: #7c3aed; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; background: var(--bg-primary); color: var(--text-primary); line-height: 1.5; min-height: 100vh; }
+        .header { background: var(--bg-secondary); padding: 12px 24px; position: sticky; top: 0; z-index: 100; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .header-content { max-width: 1800px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; }
+        .logo { display: flex; align-items: center; gap: 10px; }
+        .logo-icon { width: 32px; height: 32px; background: linear-gradient(135deg, #7c3aed, #3b82f6); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+        .logo-text { font-size: 18px; font-weight: 700; background: linear-gradient(135deg, #7c3aed, #3b82f6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .logo-version { font-size: 11px; color: var(--text-secondary); }
+        .main-tabs { display: flex; gap: 4px; }
+        .main-tab { padding: 8px 18px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; transition: all 0.2s; background: transparent; color: var(--text-secondary); border: none; }
+        .main-tab:hover { background: rgba(255,255,255,0.1); color: var(--text-primary); }
+        .main-tab.active { background: var(--accent); color: white; }
+        .sub-header { background: var(--bg-secondary); padding: 8px 24px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        .sub-tabs { max-width: 1800px; margin: 0 auto; display: flex; gap: 6px; flex-wrap: wrap; }
+        .sub-tab { padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; transition: all 0.2s; background: rgba(255,255,255,0.05); color: var(--text-secondary); border: none; }
+        .sub-tab:hover { background: rgba(255,255,255,0.1); color: var(--text-primary); }
+        .sub-tab.active { background: rgba(124,58,237,0.3); color: var(--accent); }
+        .main { padding: 20px; max-width: 1800px; margin: 0 auto; }
+        .update-info { text-align: center; padding: 12px; color: var(--text-secondary); font-size: 12px; }
+        .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+        .news-card { background: var(--bg-card); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; height: 420px; transition: transform 0.2s, box-shadow 0.2s; }
+        .news-card:hover { transform: translateY(-3px); box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
+        .card-header { padding: 14px; display: flex; justify-content: space-between; align-items: center; }
+        .card-title-wrap { display: flex; align-items: center; gap: 10px; }
+        .card-icon { width: 36px; height: 36px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 18px; color: white; }
+        .card-title { font-size: 14px; font-weight: 600; }
+        .card-subtitle { font-size: 11px; color: var(--text-secondary); margin-top: 2px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .card-count { font-size: 11px; padding: 3px 8px; border-radius: 10px; background: rgba(255,255,255,0.1); }
+        .news-list { flex: 1; overflow-y: auto; padding: 0 12px 12px; }
+        .news-list::-webkit-scrollbar { width: 5px; }
+        .news-list::-webkit-scrollbar-track { background: transparent; }
+        .news-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 3px; }
+        .news-item { display: flex; gap: 8px; padding: 7px 6px; border-radius: 6px; transition: background 0.2s; }
+        .news-item:hover { background: rgba(255,255,255,0.05); }
+        .news-rank { min-width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 600; border-radius: 5px; background: rgba(255,255,255,0.1); flex-shrink: 0; }
+        .news-rank.top-1 { background: #fbbf24; color: #1a1a1a; }
+        .news-rank.top-2 { background: #94a3b8; color: #1a1a1a; }
+        .news-rank.top-3 { background: #cd7f32; color: #1a1a1a; }
+        .news-new { display: inline; padding: 1px 4px; background: #ef4444; color: white; font-size: 8px; font-weight: 600; border-radius: 2px; margin-left: 4px; vertical-align: middle; }
+        .news-text { flex: 1; min-width: 0; }
+        .news-title-link { font-size: 13px; color: var(--text-primary); text-decoration: none; line-height: 1.35; }
+        .news-title-link:hover { color: var(--accent); }
+        .news-title-link:visited { color: var(--text-secondary); }
+        .news-meta { font-size: 10px; color: var(--text-secondary); margin-top: 3px; }
+        .news-source { padding: 1px 5px; background: rgba(255,255,255,0.08); border-radius: 3px; }
+        .theme-purple .card-header { background: linear-gradient(135deg, rgba(124,58,237,0.25), rgba(124,58,237,0.08)); }
+        .theme-purple .card-icon { background: linear-gradient(135deg, #7c3aed, #9333ea); }
+        .theme-blue .card-header { background: linear-gradient(135deg, rgba(59,130,246,0.25), rgba(59,130,246,0.08)); }
+        .theme-blue .card-icon { background: linear-gradient(135deg, #3b82f6, #2563eb); }
+        .theme-green .card-header { background: linear-gradient(135deg, rgba(16,185,129,0.25), rgba(16,185,129,0.08)); }
+        .theme-green .card-icon { background: linear-gradient(135deg, #10b981, #059669); }
+        .theme-red .card-header { background: linear-gradient(135deg, rgba(239,68,68,0.25), rgba(239,68,68,0.08)); }
+        .theme-red .card-icon { background: linear-gradient(135deg, #ef4444, #dc2626); }
+        .theme-orange .card-header { background: linear-gradient(135deg, rgba(249,115,22,0.25), rgba(249,115,22,0.08)); }
+        .theme-orange .card-icon { background: linear-gradient(135deg, #f97316, #ea580c); }
+        .theme-teal .card-header { background: linear-gradient(135deg, rgba(20,184,166,0.25), rgba(20,184,166,0.08)); }
+        .theme-teal .card-icon { background: linear-gradient(135deg, #14b8a6, #0d9488); }
+        .theme-pink .card-header { background: linear-gradient(135deg, rgba(236,72,153,0.25), rgba(236,72,153,0.08)); }
+        .theme-pink .card-icon { background: linear-gradient(135deg, #ec4899, #db2777); }
+        .theme-indigo .card-header { background: linear-gradient(135deg, rgba(99,102,241,0.25), rgba(99,102,241,0.08)); }
+        .theme-indigo .card-icon { background: linear-gradient(135deg, #6366f1, #4f46e5); }
+        .topics-nav-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+        .topic-nav-card { background: var(--bg-card); border-radius: 12px; padding: 16px; cursor: pointer; transition: all 0.2s; }
+        .topic-nav-card:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.2); background: rgba(124,58,237,0.15); }
+        .topic-nav-header { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+        .topic-nav-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+        .topic-nav-title { font-size: 15px; font-weight: 600; }
+        .topic-nav-keywords { font-size: 11px; color: var(--text-secondary); }
+        .topic-nav-stats { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-secondary); padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); }
+        .topic-nav-btn { color: var(--accent); }
+        .report-frame { width: 100%; height: calc(100vh - 160px); border: none; border-radius: 12px; background: white; }
+        .header-actions { display: flex; align-items: center; gap: 8px; }
+        .refresh-btn { width: 36px; height: 36px; border-radius: 8px; border: none; background: rgba(255,255,255,0.1); cursor: pointer; font-size: 16px; transition: all 0.2s; }
+        .refresh-btn:hover { background: rgba(255,255,255,0.2); }
+        .refresh-btn.loading { animation: spin 1s linear infinite; }
+        .crawl-btn { padding: 8px 14px; border-radius: 8px; border: none; background: linear-gradient(135deg, #7c3aed, #3b82f6); color: white; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.2s; min-width: 80px; height: 36px; line-height: 1; }
+        .crawl-btn:hover { opacity: 0.9; transform: scale(1.02); }
+        .crawl-btn.loading { opacity: 0.7; cursor: not-allowed; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .auto-refresh-select { padding: 8px 12px; border-radius: 8px; border: none; background: rgba(255,255,255,0.1); color: var(--text-primary); font-size: 12px; cursor: pointer; }
+        .auto-refresh-select option { background: var(--bg-secondary); }
+        .update-time-header { font-size: 12px; color: var(--text-secondary); padding: 6px 12px; background: rgba(255,255,255,0.05); border-radius: 6px; }
+        @media (max-width: 768px) { .header-content { flex-direction: column; } .card-grid, .topics-nav-grid { grid-template-columns: 1fr; } .news-card { height: 360px; } }
+        .loading { text-align: center; padding: 40px; color: var(--text-secondary); }
+        .new-news-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(400px, 1fr)); gap: 12px; }
+        .new-news-item { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; background: var(--bg-card); border-radius: 10px; transition: all 0.2s; }
+        .new-news-item:hover { background: rgba(124,58,237,0.15); transform: translateY(-2px); }
+        .new-news-item .news-rank { min-width: 24px; height: 24px; flex-shrink: 0; }
+        .new-news-item .news-text { flex: 1; min-width: 0; }
+        .new-news-item .news-title-link { display: block; font-size: 14px; line-height: 1.4; }
+        .new-news-item .news-meta { margin-top: 6px; }
+        .topic-tag { display: inline-block; padding: 2px 6px; margin: 0 2px; background: rgba(124,58,237,0.2); color: #a78bfa; border-radius: 4px; font-size: 10px; cursor: pointer; transition: all 0.2s; }
+        .topic-tag:hover { background: rgba(124,58,237,0.4); }
+        .keywords-popup { position: fixed; z-index: 1000; background: var(--bg-card); border: 1px solid rgba(255,255,255,0.1); border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); min-width: 280px; max-width: 400px; }
+        .keywords-popup-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .keywords-popup-title { font-weight: 600; font-size: 14px; }
+        .keywords-popup-close { cursor: pointer; font-size: 20px; color: var(--text-secondary); padding: 0 4px; }
+        .keywords-popup-close:hover { color: var(--text-primary); }
+        .keywords-popup-content { padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 8px; max-height: 300px; overflow-y: auto; }
+        .keyword-item { display: inline-block; padding: 4px 10px; background: rgba(124,58,237,0.15); color: #a78bfa; border-radius: 6px; font-size: 12px; }
+        .no-keywords { color: var(--text-secondary); font-size: 13px; }
+        .filter-panel { background: var(--bg-card); border-radius: 12px; padding: 16px; margin-bottom: 20px; }
+        .filter-header { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
+        .filter-label { font-weight: 600; color: var(--text-primary); }
+        .filter-mode { display: flex; gap: 8px; }
+        .mode-btn { padding: 6px 12px; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; background: transparent; color: var(--text-secondary); cursor: pointer; font-size: 12px; transition: all 0.2s; }
+        .mode-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .mode-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
+        .clear-btn { padding: 6px 12px; border: 1px solid rgba(239,68,68,0.5); border-radius: 6px; background: transparent; color: #ef4444; cursor: pointer; font-size: 12px; transition: all 0.2s; }
+        .clear-btn:hover { background: rgba(239,68,68,0.1); }
+        .filter-topics-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+        .filter-topic-chip { display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px; border: 1px solid rgba(255,255,255,0.15); border-radius: 20px; background: rgba(255,255,255,0.05); font-size: 13px; }
+        .filter-topic-chip.has-selection { background: rgba(124,58,237,0.15); border-color: rgba(124,58,237,0.4); }
+        .filter-topic-name { cursor: pointer; color: var(--text-secondary); transition: all 0.2s; }
+        .filter-topic-name:hover { color: var(--accent); }
+        .filter-topic-name.selected { color: var(--accent); font-weight: 600; }
+        .filter-topic-expand { cursor: pointer; font-size: 10px; color: var(--text-secondary); padding: 2px 4px; border-radius: 4px; margin-left: 2px; }
+        .filter-topic-expand:hover { background: rgba(255,255,255,0.1); color: var(--accent); }
+        .filter-topic-badge { font-size: 10px; background: rgba(124,58,237,0.3); color: #a78bfa; padding: 1px 5px; border-radius: 8px; margin-left: 2px; }
+        .kw-popup { position: fixed; z-index: 1000; background: var(--bg-card); border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); min-width: 200px; max-width: 350px; max-height: 300px; overflow: hidden; }
+        .kw-popup-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .kw-popup-title { font-weight: 600; font-size: 13px; }
+        .kw-popup-actions { display: flex; gap: 8px; }
+        .kw-popup-btn { font-size: 11px; padding: 3px 8px; border-radius: 4px; cursor: pointer; border: 1px solid rgba(255,255,255,0.2); background: transparent; color: var(--text-secondary); }
+        .kw-popup-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .kw-popup-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
+        .kw-popup-close { cursor: pointer; font-size: 18px; color: var(--text-secondary); padding: 0 4px; }
+        .kw-popup-close:hover { color: var(--text-primary); }
+        .kw-popup-content { padding: 10px 14px; display: flex; flex-wrap: wrap; gap: 6px; max-height: 220px; overflow-y: auto; }
+        .kw-item { padding: 4px 10px; border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; font-size: 12px; color: var(--text-secondary); cursor: pointer; transition: all 0.2s; }
+        .kw-item:hover { border-color: var(--accent); color: var(--accent); }
+        .kw-item.selected { background: rgba(124,58,237,0.3); border-color: var(--accent); color: #a78bfa; }
+        .filter-info { font-size: 12px; color: var(--text-secondary); }
+        @media (max-width: 900px) { .new-news-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+<header class="header">
+    <div class="header-content">
+        <div class="logo"><div class="logo-icon">📡</div><span class="logo-text">TrendRadar</span><span class="logo-version">v1.0</span></div>
+        <nav class="main-tabs">
+            <button class="main-tab active" data-view="topics">主题聚合</button>
+            <button class="main-tab" data-view="sources">来源聚合</button>
+            <button class="main-tab" data-view="filter">主题筛选</button>
+            <button class="main-tab" data-view="newonly">增量新闻</button>
+            <button class="main-tab" data-view="nav">主题导航</button>
+            <button class="main-tab" data-view="report">原始报告</button>
+        </nav>
+        <div class="header-actions">
+            <span class="update-time-header">更新: <span id="updateTime">加载中...</span></span>
+            <button id="crawlBtn" class="crawl-btn" title="立即爬取新数据">🕷️ 爬取</button>
+            <button id="refreshBtn" class="refresh-btn" title="刷新数据">🔄</button>
+            <select id="autoRefresh" class="auto-refresh-select">
+                <option value="0">手动刷新</option>
+                <option value="60">1分钟</option>
+                <option value="300" selected>5分钟</option>
+                <option value="600">10分钟</option>
+            </select>
+        </div>
+    </div>
+</header>
+<div class="sub-header" id="subHeader"><div class="sub-tabs" id="subTabs"></div></div>
+<main class="main">
+    <div id="viewContainer"></div>
+</main>
+<script>
+const topicsMeta = [
+    { icon: "🤖", theme: "purple", category: "ai" }, { icon: "🇨🇳", theme: "red", category: "world" },
+    { icon: "🌏", theme: "blue", category: "world" }, { icon: "📱", theme: "red", category: "company" },
+    { icon: "🚗", theme: "teal", category: "company" }, { icon: "🚀", theme: "indigo", category: "ai" },
+    { icon: "🍎", theme: "blue", category: "company" }, { icon: "🎮", theme: "green", category: "company" },
+    { icon: "🔍", theme: "orange", category: "ai" }, { icon: "🦾", theme: "purple", category: "ai" },
+    { icon: "💻", theme: "teal", category: "ai" }, { icon: "📦", theme: "red", category: "company" },
+    { icon: "🎵", theme: "pink", category: "company" }, { icon: "🧠", theme: "orange", category: "ai" },
+    { icon: "🤖", theme: "purple", category: "ai" }, { icon: "🚙", theme: "green", category: "company" },
+    { icon: "🚁", theme: "blue", category: "company" }, { icon: "🎬", theme: "orange", category: "other" },
+    { icon: "🪟", theme: "blue", category: "company" }, { icon: "💾", theme: "red", category: "company" },
+    { icon: "💬", theme: "teal", category: "ai" }, { icon: "🔬", theme: "indigo", category: "ai" },
+    { icon: "💧", theme: "blue", category: "other" }
+];
+const sourceMeta = {
+    '知乎': { icon: '知', theme: 'blue', category: 'social' }, '微博': { icon: '微', theme: 'red', category: 'social' },
+    'V2EX': { icon: 'V', theme: 'teal', category: 'tech' }, 'IT之家': { icon: 'IT', theme: 'red', category: 'tech' },
+    '掘金': { icon: '掘', theme: 'blue', category: 'tech' }, 'Bilibili': { icon: 'B', theme: 'pink', category: 'social' },
+    '哔哩哔哩': { icon: 'B', theme: 'pink', category: 'social' }, '抖音': { icon: '抖', theme: 'pink', category: 'social' },
+    'GitHub': { icon: 'G', theme: 'purple', category: 'tech' }, 'Hacker News': { icon: 'Y', theme: 'orange', category: 'tech' },
+    'ProductHunt': { icon: 'P', theme: 'orange', category: 'tech' }, '36氪': { icon: '36', theme: 'blue', category: 'news' },
+    '华尔街见闻': { icon: '华', theme: 'blue', category: 'finance' }, '华尔街见闻 快讯': { icon: '华', theme: 'blue', category: 'finance' },
+    '华尔街见闻 最热': { icon: '华', theme: 'blue', category: 'finance' }, '华尔街见闻 最新': { icon: '华', theme: 'blue', category: 'finance' },
+    '财联社': { icon: '财', theme: 'red', category: 'finance' }, '财联社热门': { icon: '财', theme: 'red', category: 'finance' },
+    '财联社 深度': { icon: '财', theme: 'red', category: 'finance' }, 'MKT新闻': { icon: 'M', theme: 'indigo', category: 'finance' },
+    'Solidot': { icon: 'S', theme: 'green', category: 'tech' }, '虎扑': { icon: '虎', theme: 'orange', category: 'social' },
+    '百度': { icon: '百', theme: 'blue', category: 'news' }, '今日头条': { icon: '头', theme: 'red', category: 'news' },
+    '澎湃新闻': { icon: '澎', theme: 'red', category: 'news' }, '少数派': { icon: '少', theme: 'red', category: 'tech' },
+    '酷安': { icon: '酷', theme: 'green', category: 'tech' }, '豆瓣': { icon: '豆', theme: 'green', category: 'social' },
+    '卫星通讯社': { icon: '卫', theme: 'blue', category: 'news' }, '法布财经 头条': { icon: '法', theme: 'red', category: 'finance' },
+    '格隆汇': { icon: '格', theme: 'blue', category: 'finance' }, '雪球': { icon: '雪', theme: 'blue', category: 'finance' }
+};
+let topicsData = [], sourcesData = [], currentView = 'topics', currentFilter = 'all', autoRefreshTimer = null;
+
+function loadStateFromHash() {
+    const hash = window.location.hash.slice(1);
+    if (hash) {
+        const [view, filter] = hash.split('/');
+        if (['topics', 'sources', 'filter', 'newonly', 'nav', 'report'].includes(view)) {
+            currentView = view;
+            currentFilter = filter || 'all';
+        }
+    }
+}
+
+function saveStateToHash() {
+    window.location.hash = currentFilter !== 'all' ? `${currentView}/${currentFilter}` : currentView;
+}
+
+// 主题筛选状态
+let selectedTopics = []; // 格式: [{topic: '主题名', keywords: ['关键词1', '关键词2']}] 或 [{topic: '主题名', keywords: 'all'}]
+let filterMode = 'or'; // 'or' 或 'and'
+let expandedTopics = []; // 展开的主题列表
+
+const subTabsConfig = {
+    topics: [{ id: 'all', name: '全部' }, { id: 'ai', name: 'AI科技' }, { id: 'company', name: '企业人物' }, { id: 'world', name: '国际' }, { id: 'other', name: '其他' }],
+    sources: [{ id: 'all', name: '全部' }, { id: 'tech', name: '科技' }, { id: 'finance', name: '财经' }, { id: 'social', name: '社交' }, { id: 'news', name: '资讯' }],
+    filter: [],
+    newonly: [],
+    nav: [{ id: 'all', name: '全部主题' }], report: []
+};
+
+async function loadData() {
+    try {
+        const [topicsRes, sourcesRes] = await Promise.all([fetch('/api/topics'), fetch('/api/sources')]);
+        const topicsJson = await topicsRes.json();
+        const sourcesJson = await sourcesRes.json();
+        topicsData = topicsJson.topics || [];
+        sourcesData = sourcesJson.sources || [];
+        document.getElementById('updateTime').textContent = topicsJson.update_time || '未知';
+        renderView();
+        return true;
+    } catch (e) {
+        console.error('API load failed, fallback to HTML parsing', e);
+        return loadDataFromHTML();
+    }
+}
+
+async function loadDataFromHTML() {
+    try {
+        const res = await fetch('index.html');
+        const html = await res.text();
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        const dateEl = doc.querySelector('.info-value');
+        if (dateEl) document.getElementById('updateTime').textContent = dateEl.textContent;
+        topicsData = []; sourcesData = [];
+        const sourcesMap = {};
+        doc.querySelectorAll('.word-group').forEach((group, idx) => {
+            const nameEl = group.querySelector('.word-name');
+            const countEl = group.querySelector('.word-count');
+            const news = [];
+            group.querySelectorAll('.news-item').forEach((item, i) => {
+                const link = item.querySelector('.news-link');
+                const source = item.querySelector('.source-name');
+                if (link) {
+                    const n = { rank: i + 1, title: link.textContent.trim(), url: link.href, source: source ? source.textContent.trim() : '' };
+                    news.push(n);
+                    if (n.source) { if (!sourcesMap[n.source]) sourcesMap[n.source] = []; sourcesMap[n.source].push({ title: n.title, url: n.url }); }
+                }
+            });
+            topicsData.push({ id: idx, name: nameEl ? nameEl.textContent.trim() : `Topic ${idx}`, count: countEl ? parseInt(countEl.textContent) : news.length, news });
+        });
+        sourcesData = Object.entries(sourcesMap).sort((a, b) => b[1].length - a[1].length).map(([name, news]) => ({ name, count: news.length, news }));
+        renderView();
+        return true;
+    } catch (e) { document.getElementById('viewContainer').innerHTML = '<div class="loading">加载失败，请刷新</div>'; return false; }
+}
+
+function renderSubTabs() {
+    const tabs = subTabsConfig[currentView] || [];
+    document.getElementById('subHeader').style.display = tabs.length ? 'block' : 'none';
+    document.getElementById('subTabs').innerHTML = tabs.map(t => `<button class="sub-tab ${t.id === currentFilter ? 'active' : ''}" data-filter="${t.id}">${t.name}</button>`).join('');
+}
+
+function renderView() {
+    renderSubTabs();
+    const container = document.getElementById('viewContainer');
+    if (currentView === 'topics') renderTopicsView(container);
+    else if (currentView === 'sources') renderSourcesView(container);
+    else if (currentView === 'filter') renderFilterView(container);
+    else if (currentView === 'newonly') renderNewOnlyView(container);
+    else if (currentView === 'nav') renderNavView(container);
+    else if (currentView === 'report') container.innerHTML = '<iframe src="index.html" class="report-frame"></iframe>';
+}
+
+function renderTopicsView(container) {
+    let topics = topicsData.map((t, i) => ({ ...t, ...(topicsMeta[i] || { icon: '📰', theme: 'purple', category: 'other' }) }));
+    if (currentFilter !== 'all') topics = topics.filter(t => t.category === currentFilter);
+    container.innerHTML = `<div class="card-grid">${topics.map((t, idx) => `
+        <div class="news-card theme-${t.theme}"><div class="card-header"><div class="card-title-wrap"><div class="card-icon" onclick="showKeywordsPopup(${idx}, event)" style="cursor:pointer" title="点击查看关键词">${t.icon}</div><div><div class="card-title">${t.name}</div><div class="card-subtitle">${t.count} 条新闻</div></div></div><span class="card-count">${t.count}</span></div>
+        <div class="news-list">${(t.news || []).map((n, i) => `<div class="news-item"><span class="news-rank ${i < 3 ? 'top-' + (i+1) : ''}">${n.rank}</span><div class="news-text"><a href="${n.url}" target="_blank" class="news-title-link">${n.title}${n.isNew ? ' <span class="news-new">NEW</span>' : ''}</a><div class="news-meta"><span class="news-source">${n.source}</span>${formatSubTags(n.matchedTopics, t.name)}</div></div></div>`).join('')}</div></div>`).join('')}</div>`;
+}
+
+function formatSubTags(matchedTopics, parentTopic) {
+    if (!matchedTopics || matchedTopics.length === 0) return '';
+    const tags = [];
+    matchedTopics.forEach(mt => {
+        if (mt.topic === parentTopic) {
+            // 同一主题，只显示匹配的关键词，点击跳转到该主题+关键词
+            mt.matched.forEach(m => tags.push({ text: m, topic: mt.topic, kw: m }));
+        } else {
+            // 不同主题，显示 主题:关键词
+            tags.push({ text: `${mt.topic}:${mt.matched.join(' ')}`, topic: mt.topic, kw: mt.matched.join(',') });
+        }
+    });
+    if (tags.length === 0) return '';
+    return ' ' + tags.map(t => `<span class="topic-tag" onclick="jumpToFilter('${t.topic}', '${t.kw.replace(/'/g, "\\'")}')">${t.text}</span>`).join(' ');
+}
+
+function showKeywordsPopup(topicIdx, event) {
+    event.stopPropagation();
+    const topic = topicsData[topicIdx];
+    if (!topic) return;
+    
+    // 移除已有弹窗
+    const existing = document.querySelector('.keywords-popup');
+    if (existing) existing.remove();
+    
+    const keywords = topic.keywords || [];
+    const popup = document.createElement('div');
+    popup.className = 'keywords-popup';
+    popup.innerHTML = `
+        <div class="keywords-popup-header">
+            <span class="keywords-popup-title">${topic.name} 关键词</span>
+            <span class="keywords-popup-close" onclick="this.parentElement.parentElement.remove()">×</span>
+        </div>
+        <div class="keywords-popup-content">
+            ${keywords.length > 0 ? keywords.map(k => `<span class="keyword-item">${k}</span>`).join('') : '<span class="no-keywords">暂无关键词</span>'}
+        </div>
+    `;
+    document.body.appendChild(popup);
+    
+    // 定位弹窗
+    const rect = event.target.getBoundingClientRect();
+    popup.style.top = (rect.bottom + 10) + 'px';
+    popup.style.left = Math.max(10, rect.left - 100) + 'px';
+    
+    // 点击其他地方关闭
+    setTimeout(() => {
+        document.addEventListener('click', function closePopup(e) {
+            if (!popup.contains(e.target)) {
+                popup.remove();
+                document.removeEventListener('click', closePopup);
+            }
+        });
+    }, 100);
+}
+
+function renderSourcesView(container) {
+    let sources = sourcesData.map(s => ({ ...s, ...(sourceMeta[s.name] || { icon: s.name[0], theme: 'purple', category: 'news' }) }));
+    if (currentFilter !== 'all') sources = sources.filter(s => s.category === currentFilter);
+    container.innerHTML = `<div class="card-grid">${sources.map(s => `
+        <div class="news-card theme-${s.theme}"><div class="card-header"><div class="card-title-wrap"><div class="card-icon">${s.icon}</div><div><div class="card-title">${s.name}</div><div class="card-subtitle">${s.category}</div></div></div><span class="card-count">${s.count}</span></div>
+        <div class="news-list">${(s.news || []).map((n, i) => `<div class="news-item"><span class="news-rank ${i < 3 ? 'top-' + (i+1) : ''}">${i + 1}</span><div class="news-text"><a href="${n.url}" target="_blank" class="news-title-link">${n.title}${n.isNew ? ' <span class="news-new">NEW</span>' : ''}</a><div class="news-meta">${formatMatchedTopics(n.matchedTopics)}</div></div></div>`).join('')}</div></div>`).join('')}</div>`;
+}
+
+function formatMatchedTopics(matchedTopics) {
+    if (!matchedTopics || matchedTopics.length === 0) return '';
+    return matchedTopics.map(mt => `<span class="topic-tag" onclick="jumpToFilter('${mt.topic}', '${(mt.matched || []).join(',').replace(/'/g, "\\'")}')">${mt.topic}:${mt.matched.join(' ')}</span>`).join(' ');
+}
+
+function jumpToFilter(topicName, matchedStr) {
+    const keywords = matchedStr ? matchedStr.split(',').filter(k => k) : [];
+    selectedTopics = [{ topic: topicName, keywords: keywords.length > 0 ? keywords : 'all' }];
+    currentView = 'filter';
+    currentFilter = 'all';
+    updateMainTabs();
+    renderView();
+    saveStateToHash();
+}
+
+function renderNewOnlyView(container) {
+    // 从 sources 数据中收集所有带 isNew 标记的新闻（包含 matchedTopics）
+    const newNews = [];
+    sourcesData.forEach(source => {
+        (source.news || []).forEach(n => {
+            if (n.isNew) {
+                newNews.push({ ...n, sourceName: source.name });
+            }
+        });
+    });
+    
+    if (newNews.length === 0) {
+        container.innerHTML = '<div class="loading">暂无增量新闻</div>';
+        return;
+    }
+    
+    container.innerHTML = `<div class="new-news-grid">${newNews.map((n, i) => `<div class="new-news-item"><span class="news-rank top-1">${i + 1}</span><div class="news-text"><a href="${n.url}" target="_blank" class="news-title-link">${n.title}</a><div class="news-meta"><span class="news-source">${n.sourceName}</span> ${formatMatchedTopics(n.matchedTopics)}</div></div></div>`).join('')}</div>`;
+}
+
+function renderFilterView(container) {
+    const topics = topicsData.map((t, i) => ({ ...t, ...(topicsMeta[i] || { icon: '📰', theme: 'purple' }) }));
+    
+    // 收集所有新闻并去重
+    const allNewsMap = new Map();
+    sourcesData.forEach(source => {
+        (source.news || []).forEach(n => {
+            if (!allNewsMap.has(n.title)) {
+                allNewsMap.set(n.title, { ...n, sourceName: source.name });
+            }
+        });
+    });
+    
+    // 根据选中的主题和关键词筛选
+    let filteredNews = [];
+    if (selectedTopics.length === 0) {
+        filteredNews = Array.from(allNewsMap.values());
+    } else {
+        allNewsMap.forEach(news => {
+            const newsMatches = news.matchedTopics || [];
+            const matchResults = selectedTopics.map(sel => {
+                const topicMatch = newsMatches.find(mt => mt.topic === sel.topic);
+                if (!topicMatch) return false;
+                if (sel.keywords === 'all') return true;
+                return sel.keywords.some(kw => topicMatch.matched === kw || (Array.isArray(topicMatch.matched) && topicMatch.matched.includes(kw)));
+            });
+            if (filterMode === 'or') {
+                if (matchResults.some(r => r)) filteredNews.push(news);
+            } else {
+                if (matchResults.every(r => r)) filteredNews.push(news);
+            }
+        });
+    }
+    
+    // 统计选中的关键词数量
+    const selectedCount = selectedTopics.reduce((sum, t) => sum + (t.keywords === 'all' ? 1 : t.keywords.length), 0);
+    
+    container.innerHTML = `
+        <div class="filter-panel">
+            <div class="filter-header">
+                <span class="filter-label">筛选：</span>
+                <div class="filter-mode">
+                    <button class="mode-btn ${filterMode === 'or' ? 'active' : ''}" onclick="setFilterMode('or')">或</button>
+                    <button class="mode-btn ${filterMode === 'and' ? 'active' : ''}" onclick="setFilterMode('and')">与</button>
+                </div>
+                <button class="clear-btn" onclick="clearTopicFilter()">清除</button>
+                <span class="filter-info">已选 ${selectedCount} 项，${filteredNews.length} 条结果</span>
+            </div>
+            <div class="filter-topics-row">
+                ${topics.map(t => {
+                    const sel = selectedTopics.find(s => s.topic === t.name);
+                    const isAllSelected = sel && sel.keywords === 'all';
+                    const selectedKws = sel && sel.keywords !== 'all' ? sel.keywords : [];
+                    const hasSelection = !!sel;
+                    const badgeText = isAllSelected ? '全' : (selectedKws.length > 0 ? selectedKws.length : '');
+                    return `<span class="filter-topic-chip ${hasSelection ? 'has-selection' : ''}">
+                        <span class="filter-topic-name ${isAllSelected ? 'selected' : ''}" onclick="toggleTopicAll('${t.name}')">${t.icon} ${t.name}</span>
+                        ${badgeText ? `<span class="filter-topic-badge">${badgeText}</span>` : ''}
+                        <span class="filter-topic-expand" onclick="showKwPopup(event, '${t.name}')">▼</span>
+                    </span>`;
+                }).join('')}
+            </div>
+        </div>
+        <div class="new-news-grid">${filteredNews.map((n, i) => `<div class="new-news-item"><span class="news-rank">${i + 1}</span><div class="news-text"><a href="${n.url}" target="_blank" class="news-title-link">${n.title}</a><div class="news-meta"><span class="news-source">${n.sourceName}</span> ${formatMatchedTopics(n.matchedTopics)}</div></div></div>`).join('')}</div>
+    `;
+}
+
+function showKwPopup(event, topicName) {
+    event.stopPropagation();
+    document.querySelectorAll('.kw-popup').forEach(p => p.remove());
+    
+    const topic = topicsData.find(t => t.name === topicName);
+    const keywords = topic?.keywords || [];
+    const sel = selectedTopics.find(s => s.topic === topicName);
+    const isAllSelected = sel && sel.keywords === 'all';
+    const selectedKws = sel && sel.keywords !== 'all' ? sel.keywords : [];
+    
+    const popup = document.createElement('div');
+    popup.className = 'kw-popup';
+    popup.innerHTML = `
+        <div class="kw-popup-header">
+            <span class="kw-popup-title">${topicName}</span>
+            <div class="kw-popup-actions">
+                <button class="kw-popup-btn ${isAllSelected ? 'active' : ''}" onclick="selectAllKw('${topicName}')">全选</button>
+                <button class="kw-popup-btn" onclick="clearTopicKw('${topicName}')">清除</button>
+            </div>
+            <span class="kw-popup-close" onclick="closeKwPopup()">×</span>
+        </div>
+        <div class="kw-popup-content">
+            ${keywords.map(kw => `<span class="kw-item ${isAllSelected || selectedKws.includes(kw) ? 'selected' : ''}" onclick="toggleKeyword('${topicName}', '${kw.replace(/'/g, "\\'")}')">${kw}</span>`).join('')}
+        </div>
+    `;
+    
+    document.body.appendChild(popup);
+    const rect = event.target.getBoundingClientRect();
+    popup.style.left = Math.min(rect.left, window.innerWidth - popup.offsetWidth - 10) + 'px';
+    popup.style.top = (rect.bottom + 5) + 'px';
+    
+    setTimeout(() => document.addEventListener('click', closeKwPopup, { once: true }), 10);
+}
+
+function closeKwPopup() {
+    document.querySelectorAll('.kw-popup').forEach(p => p.remove());
+}
+
+function selectAllKw(topicName) {
+    const idx = selectedTopics.findIndex(t => t.topic === topicName);
+    if (idx >= 0) selectedTopics[idx].keywords = 'all';
+    else selectedTopics.push({ topic: topicName, keywords: 'all' });
+    renderView();
+}
+
+function clearTopicKw(topicName) {
+    selectedTopics = selectedTopics.filter(t => t.topic !== topicName);
+    renderView();
+}
+
+function toggleTopicAll(topicName) {
+    const idx = selectedTopics.findIndex(t => t.topic === topicName);
+    if (idx >= 0 && selectedTopics[idx].keywords === 'all') {
+        selectedTopics.splice(idx, 1);
+    } else if (idx >= 0) {
+        selectedTopics[idx].keywords = 'all';
+    } else {
+        selectedTopics.push({ topic: topicName, keywords: 'all' });
+    }
+    renderView();
+}
+
+function toggleKeyword(topicName, keyword) {
+    let sel = selectedTopics.find(t => t.topic === topicName);
+    if (!sel) {
+        selectedTopics.push({ topic: topicName, keywords: [keyword] });
+    } else if (sel.keywords === 'all') {
+        const topic = topicsData.find(t => t.name === topicName);
+        sel.keywords = (topic?.keywords || []).filter(k => k !== keyword);
+        if (sel.keywords.length === 0) {
+            selectedTopics = selectedTopics.filter(t => t.topic !== topicName);
+        }
+    } else {
+        const kwIdx = sel.keywords.indexOf(keyword);
+        if (kwIdx >= 0) {
+            sel.keywords.splice(kwIdx, 1);
+            if (sel.keywords.length === 0) {
+                selectedTopics = selectedTopics.filter(t => t.topic !== topicName);
+            }
+        } else {
+            sel.keywords.push(keyword);
+        }
+    }
+    renderView();
+}
+
+function toggleTopicFilter(topicName) {
+    toggleTopicAll(topicName);
+}
+
+function setFilterMode(mode) {
+    filterMode = mode;
+    renderView();
+}
+
+function clearTopicFilter() {
+    selectedTopics = [];
+    renderView();
+}
+
+function renderNavView(container) {
+    const topics = topicsData.map((t, i) => ({ ...t, ...(topicsMeta[i] || { icon: '📰', theme: 'purple', category: 'other' }) }));
+    container.innerHTML = `<div class="topics-nav-grid">${topics.map((t, i) => `
+        <div class="topic-nav-card" onclick="switchToTopic(${i})"><div class="topic-nav-header"><div class="topic-nav-icon card-icon theme-${t.theme}" style="background:linear-gradient(135deg,var(--accent),#3b82f6)">${t.icon}</div><div><div class="topic-nav-title">${t.name}</div><div class="topic-nav-keywords">${t.count} 条新闻</div></div></div><div class="topic-nav-stats"><span>${t.category}</span><span class="topic-nav-btn">查看详情 →</span></div></div>`).join('')}</div>`;
+}
+
+function switchToTopic(idx) { currentView = 'topics'; currentFilter = topicsMeta[idx]?.category || 'all'; renderView(); updateMainTabs(); }
+function updateMainTabs() { document.querySelectorAll('.main-tab').forEach(t => t.classList.toggle('active', t.dataset.view === currentView)); }
+function refreshData() { const btn = document.getElementById('refreshBtn'); btn.classList.add('loading'); loadData().finally(() => btn.classList.remove('loading')); }
+function setupAutoRefresh() { const interval = parseInt(document.getElementById('autoRefresh').value) * 1000; if (autoRefreshTimer) clearInterval(autoRefreshTimer); if (interval > 0) autoRefreshTimer = setInterval(refreshData, interval); }
+
+async function triggerCrawl() {
+    const btn = document.getElementById('crawlBtn');
+    if (btn.classList.contains('loading')) return;
+    btn.classList.add('loading');
+    const originalText = btn.textContent;
+    btn.innerHTML = '🕷️ 爬取中';
+    try {
+        const res = await fetch('/api/crawl');
+        const data = await res.json();
+        if (data.success) {
+            const checkStatus = setInterval(async () => {
+                const statusRes = await fetch('/api/crawl_status');
+                const status = await statusRes.json();
+                if (!status.running) {
+                    clearInterval(checkStatus);
+                    btn.classList.remove('loading');
+                    btn.innerHTML = originalText;
+                    alert(status.message || '爬取完成');
+                    refreshData();
+                }
+            }, 3000);
+        } else {
+            btn.classList.remove('loading');
+            btn.innerHTML = originalText;
+            alert(data.message || '启动失败');
+        }
+    } catch (e) {
+        btn.classList.remove('loading');
+        btn.innerHTML = originalText;
+        alert('请求失败: ' + e.message);
+    }
+}
+
+document.querySelectorAll('.main-tab').forEach(tab => tab.addEventListener('click', () => { currentView = tab.dataset.view; currentFilter = 'all'; saveStateToHash(); renderView(); updateMainTabs(); }));
+document.getElementById('subTabs').addEventListener('click', e => { if (e.target.classList.contains('sub-tab')) { currentFilter = e.target.dataset.filter; saveStateToHash(); renderView(); } });
+document.getElementById('refreshBtn').addEventListener('click', refreshData);
+document.getElementById('crawlBtn').addEventListener('click', triggerCrawl);
+document.getElementById('autoRefresh').addEventListener('change', setupAutoRefresh);
+window.addEventListener('hashchange', () => { loadStateFromHash(); renderView(); updateMainTabs(); });
+
+loadStateFromHash(); updateMainTabs(); loadData(); setupAutoRefresh();
+</script>
+</body>
+</html>
