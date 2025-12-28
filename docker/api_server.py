@@ -219,14 +219,17 @@ def parse_index_html():
     # 加载频率词配置
     word_groups, filter_words, global_filters = load_frequency_config()
     
-    # 为 topics 中的新闻添加 matchedTopics，并构建关键词映射
+    # 为 topics 中的新闻添加 matchedTopics，并构建关键词和分类映射
     topic_keywords = {}  # 主题名 -> 关键词列表
+    topic_categories = {}  # 主题名 -> 分类
     for group in word_groups:
         topic_keywords[group["group_key"]] = group.get("normal", []) + group.get("required", [])
+        topic_categories[group["group_key"]] = group.get("category", "其他")
     
     for topic in topics:
         topic_name = topic["name"]
         topic["keywords"] = topic_keywords.get(topic_name, [])
+        topic["category"] = topic_categories.get(topic_name, "其他")
         for news in topic.get("news", []):
             title = news.get("_title_for_match", news["title"])
             matched = find_matched_topics(title, word_groups, filter_words, global_filters)

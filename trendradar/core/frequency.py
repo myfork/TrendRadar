@@ -7,8 +7,9 @@
 - 必须词（+前缀）
 - 过滤词（!前缀）
 - 全局过滤词（[GLOBAL_FILTER] 区域）
-- 最大显示数量（@前缀）
+- 最大显示数量（@数字前缀）
 - 自定义主题名称（#名称，作为词组第一行）
+- 主题分类（#名称 @分类名，在主题名后用空格分隔）
 """
 
 import os
@@ -96,11 +97,18 @@ def load_frequency_words(
         group_filter_words = []
         group_max_count = 0  # 默认不限制
         group_name = None  # 自定义主题名称
+        group_category = "其他"  # 默认分类
 
         for word in words:
             if word.startswith("#"):
-                # 自定义主题名称
-                group_name = word[1:].strip()
+                # 自定义主题名称，支持 #名称 @分类名 格式
+                name_part = word[1:].strip()
+                if " @" in name_part:
+                    parts = name_part.split(" @", 1)
+                    group_name = parts[0].strip()
+                    group_category = parts[1].strip()
+                else:
+                    group_name = name_part
             elif word.startswith("@"):
                 # 解析最大显示数量（只接受正整数）
                 try:
@@ -132,6 +140,7 @@ def load_frequency_words(
                     "normal": group_normal_words,
                     "group_key": group_key,
                     "max_count": group_max_count,
+                    "category": group_category,
                 }
             )
 

@@ -215,8 +215,8 @@ platforms:
     name: "微博"
   - id: "douyin"
     name: "抖音"
-  - id: "bilibili-hot-search"
-    name: "bilibili 热搜"
+  - id: "kuaishou"
+    name: "快手"
   - id: "tieba"
     name: "贴吧"
   - id: "zhihu"
@@ -224,9 +224,27 @@ platforms:
   - id: "hupu"
     name: "虎扑"
 
+  # === 视频/影视/娱乐类 ===
+  - id: "bilibili-hot-search"
+    name: "bilibili 热搜"
+  - id: "bilibili-hot-video"
+    name: "bilibili 热门视频"
+  - id: "bilibili-ranking"
+    name: "bilibili 排行榜"
+  - id: "qqvideo-tv-hotsearch"
+    name: "腾讯视频 热搜榜"
+  - id: "iqiyi-hot-ranklist"
+    name: "爱奇艺 热播榜"
+  - id: "douban"
+    name: "豆瓣"
+
   # === 科技类平台 ===
   - id: "ithome"
     name: "IT之家"
+  - id: "36kr-quick"
+    name: "36氪 快讯"
+  - id: "36kr-renqi"
+    name: "36氪 人气榜"
   - id: "juejin"
     name: "掘金"
   - id: "github"
@@ -245,22 +263,17 @@ platforms:
     name: "少数派"
   - id: "producthunt"
     name: "ProductHunt"
-
-  # === 其他/工具类 ===
-  - id: "chongbuluo"
-    name: "虫部落"
-
   - id: "coolapk"
     name: "酷安"
-
-  - id: "douban"
-    name: "豆瓣"
-
-  - id: "36kr-quick"
-    name: "36氪 快讯"
-
-  - id: "36kr-renqi"
-    name: "36氪 人气榜"
-
   - id: "freebuf"
     name: "Freebuf 网络安全"
+
+  # === 社区/论坛类 ===
+  - id: "chongbuluo"
+    name: "虫部落 最新"
+  - id: "chongbuluo-hot"
+    name: "虫部落 最热"
+
+  # === 游戏类 ===
+  - id: "steam"
+    name: "Steam 在线人数"

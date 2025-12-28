@@ -22,7 +22,7 @@
         .sub-tabs { max-width: 1800px; margin: 0 auto; display: flex; gap: 6px; flex-wrap: wrap; }
         .sub-tab { padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; transition: all 0.2s; background: rgba(255,255,255,0.05); color: var(--text-secondary); border: none; }
         .sub-tab:hover { background: rgba(255,255,255,0.1); color: var(--text-primary); }
-        .sub-tab.active { background: rgba(124,58,237,0.3); color: var(--accent); }
+        .sub-tab.active { background: rgba(124,58,237,0.3); color: white; }
         .main { padding: 20px; max-width: 1800px; margin: 0 auto; }
         .update-info { text-align: center; padding: 12px; color: var(--text-secondary); font-size: 12px; }
         .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
@@ -47,8 +47,10 @@
         .news-new { display: inline; padding: 1px 4px; background: #ef4444; color: white; font-size: 8px; font-weight: 600; border-radius: 2px; margin-left: 4px; vertical-align: middle; }
         .news-text { flex: 1; min-width: 0; }
         .news-title-link { font-size: 13px; color: var(--text-primary); text-decoration: none; line-height: 1.35; }
-        .news-title-link:hover { color: var(--accent); }
+        .news-title-link:hover { text-decoration: underline; }
         .news-title-link:visited { color: var(--text-secondary); }
+        .news-source { cursor: pointer; transition: color 0.2s; }
+        .news-source:hover { color: var(--accent); }
         .news-meta { font-size: 10px; color: var(--text-secondary); margin-top: 3px; }
         .news-source { padding: 1px 5px; background: rgba(255,255,255,0.08); border-radius: 3px; }
         .theme-purple .card-header { background: linear-gradient(135deg, rgba(124,58,237,0.25), rgba(124,58,237,0.08)); }
@@ -107,8 +109,16 @@
         .keywords-popup-content { padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 8px; max-height: 300px; overflow-y: auto; }
         .keyword-item { display: inline-block; padding: 4px 10px; background: rgba(124,58,237,0.15); color: #a78bfa; border-radius: 6px; font-size: 12px; }
         .no-keywords { color: var(--text-secondary); font-size: 13px; }
-        .filter-panel { background: var(--bg-card); border-radius: 12px; padding: 16px; margin-bottom: 20px; }
-        .filter-header { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
+        .filter-panel { background: var(--bg-card); border-radius: 12px; padding: 12px 16px; margin-bottom: 20px; }
+        .filter-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+        .filter-header.sub { margin-top: 10px; }
+        .filter-label { font-weight: 600; color: var(--text-primary); font-size: 13px; }
+        .filter-toggle { cursor: pointer; font-size: 11px; color: var(--text-secondary); padding: 3px 8px; border-radius: 4px; background: rgba(255,255,255,0.05); }
+        .filter-toggle:hover { background: rgba(255,255,255,0.1); color: var(--accent); }
+        .filter-summary { font-size: 11px; color: var(--text-secondary); flex: 1; }
+        .filter-summary span { color: var(--accent); }
+        .filter-body { margin-top: 10px; }
+        .filter-body.collapsed { display: none; }
         .filter-label { font-weight: 600; color: var(--text-primary); }
         .filter-mode { display: flex; gap: 8px; }
         .mode-btn { padding: 6px 12px; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; background: transparent; color: var(--text-secondary); cursor: pointer; font-size: 12px; transition: all 0.2s; }
@@ -149,7 +159,7 @@
         <nav class="main-tabs">
             <button class="main-tab active" data-view="topics">主题聚合</button>
             <button class="main-tab" data-view="sources">来源聚合</button>
-            <button class="main-tab" data-view="filter">主题筛选</button>
+            <button class="main-tab" data-view="filter">筛选</button>
             <button class="main-tab" data-view="newonly">增量新闻</button>
             <button class="main-tab" data-view="nav">主题导航</button>
             <button class="main-tab" data-view="report">原始报告</button>
@@ -187,27 +197,48 @@ const topicsMeta = [
     { icon: "💧", theme: "blue", category: "other" }
 ];
 const sourceMeta = {
-    '知乎': { icon: '知', theme: 'blue', category: 'social' }, '微博': { icon: '微', theme: 'red', category: 'social' },
-    'V2EX': { icon: 'V', theme: 'teal', category: 'tech' }, 'IT之家': { icon: 'IT', theme: 'red', category: 'tech' },
-    '掘金': { icon: '掘', theme: 'blue', category: 'tech' }, 'Bilibili': { icon: 'B', theme: 'pink', category: 'social' },
-    '哔哩哔哩': { icon: 'B', theme: 'pink', category: 'social' }, '抖音': { icon: '抖', theme: 'pink', category: 'social' },
-    'GitHub': { icon: 'G', theme: 'purple', category: 'tech' }, 'Hacker News': { icon: 'Y', theme: 'orange', category: 'tech' },
-    'ProductHunt': { icon: 'P', theme: 'orange', category: 'tech' }, '36氪': { icon: '36', theme: 'blue', category: 'news' },
+    // === 综合新闻媒体类 (news) ===
+    '今日头条': { icon: '头', theme: 'red', category: 'news' }, '百度热搜': { icon: '百', theme: 'blue', category: 'news' },
+    '澎湃新闻': { icon: '澎', theme: 'red', category: 'news' }, '凤凰网': { icon: '凤', theme: 'red', category: 'news' },
+    '参考消息': { icon: '参', theme: 'red', category: 'news' }, '卫星通讯社': { icon: '卫', theme: 'blue', category: 'news' },
+    '联合早报': { icon: '早', theme: 'red', category: 'news' }, 'MKT新闻': { icon: 'M', theme: 'indigo', category: 'news' },
+    '靠谱新闻': { icon: '靠', theme: 'gray', category: 'news' }, '腾讯新闻': { icon: '腾', theme: 'blue', category: 'news' },
+    // === 财经投资类 (finance) ===
     '华尔街见闻': { icon: '华', theme: 'blue', category: 'finance' }, '华尔街见闻 快讯': { icon: '华', theme: 'blue', category: 'finance' },
     '华尔街见闻 最热': { icon: '华', theme: 'blue', category: 'finance' }, '华尔街见闻 最新': { icon: '华', theme: 'blue', category: 'finance' },
     '财联社': { icon: '财', theme: 'red', category: 'finance' }, '财联社热门': { icon: '财', theme: 'red', category: 'finance' },
-    '财联社 深度': { icon: '财', theme: 'red', category: 'finance' }, 'MKT新闻': { icon: 'M', theme: 'indigo', category: 'finance' },
-    'Solidot': { icon: 'S', theme: 'green', category: 'tech' }, '虎扑': { icon: '虎', theme: 'orange', category: 'social' },
-    '百度': { icon: '百', theme: 'blue', category: 'news' }, '今日头条': { icon: '头', theme: 'red', category: 'news' },
-    '澎湃新闻': { icon: '澎', theme: 'red', category: 'news' }, '少数派': { icon: '少', theme: 'red', category: 'tech' },
-    '酷安': { icon: '酷', theme: 'green', category: 'tech' }, '豆瓣': { icon: '豆', theme: 'green', category: 'social' },
-    '卫星通讯社': { icon: '卫', theme: 'blue', category: 'news' }, '法布财经 头条': { icon: '法', theme: 'red', category: 'finance' },
-    '格隆汇': { icon: '格', theme: 'blue', category: 'finance' }, '雪球': { icon: '雪', theme: 'blue', category: 'finance' }
+    '财联社 电报': { icon: '财', theme: 'red', category: 'finance' }, '财联社 深度': { icon: '财', theme: 'red', category: 'finance' },
+    '格隆汇': { icon: '格', theme: 'blue', category: 'finance' }, '雪球': { icon: '雪', theme: 'blue', category: 'finance' },
+    '金十数据': { icon: '金', theme: 'blue', category: 'finance' }, '快讯通': { icon: '快', theme: 'emerald', category: 'finance' },
+    '法布财经 快讯': { icon: '法', theme: 'emerald', category: 'finance' }, '法布财经 头条': { icon: '法', theme: 'emerald', category: 'finance' },
+    // === 社交/短视频类 (social) ===
+    '微博': { icon: '微', theme: 'red', category: 'social' }, '抖音': { icon: '抖', theme: 'pink', category: 'social' },
+    '快手': { icon: '快', theme: 'orange', category: 'social' }, '贴吧': { icon: '贴', theme: 'blue', category: 'social' },
+    '知乎': { icon: '知', theme: 'blue', category: 'social' }, '虎扑': { icon: '虎', theme: 'orange', category: 'social' },
+    // === 视频/影视/娱乐类 (video) ===
+    'Bilibili': { icon: 'B', theme: 'pink', category: 'video' }, '哔哩哔哩': { icon: 'B', theme: 'pink', category: 'video' },
+    'bilibili 热搜': { icon: 'B', theme: 'pink', category: 'video' }, 'bilibili 热门视频': { icon: 'B', theme: 'pink', category: 'video' },
+    'bilibili 排行榜': { icon: 'B', theme: 'pink', category: 'video' }, '腾讯视频 热搜榜': { icon: '腾', theme: 'blue', category: 'video' },
+    '爱奇艺 热播榜': { icon: '艺', theme: 'green', category: 'video' }, '豆瓣': { icon: '豆', theme: 'green', category: 'video' },
+    // === 科技类平台 (tech) ===
+    'IT之家': { icon: 'IT', theme: 'red', category: 'tech' }, '36氪': { icon: '36', theme: 'blue', category: 'tech' },
+    '36氪 快讯': { icon: '36', theme: 'blue', category: 'tech' }, '36氪 人气榜': { icon: '36', theme: 'blue', category: 'tech' },
+    '掘金': { icon: '掘', theme: 'blue', category: 'tech' }, 'GitHub': { icon: 'G', theme: 'purple', category: 'tech' },
+    'Hacker News': { icon: 'Y', theme: 'orange', category: 'tech' }, 'Solidot': { icon: 'S', theme: 'green', category: 'tech' },
+    'V2EX': { icon: 'V', theme: 'teal', category: 'tech' }, '牛客网': { icon: '牛', theme: 'blue', category: 'tech' },
+    '远景论坛': { icon: '远', theme: 'blue', category: 'tech' }, '少数派': { icon: '少', theme: 'red', category: 'tech' },
+    'ProductHunt': { icon: 'P', theme: 'orange', category: 'tech' }, '酷安': { icon: '酷', theme: 'green', category: 'tech' },
+    'Freebuf 网络安全': { icon: 'F', theme: 'green', category: 'tech' },
+    // === 社区/论坛类 (community) ===
+    '虫部落': { icon: '虫', theme: 'green', category: 'community' }, '虫部落 最新': { icon: '虫', theme: 'green', category: 'community' },
+    '虫部落 最热': { icon: '虫', theme: 'green', category: 'community' },
+    // === 游戏类 (game) ===
+    'Steam 在线人数': { icon: 'S', theme: 'blue', category: 'game' }, 'Steam': { icon: 'S', theme: 'blue', category: 'game' }
 };
 let topicsData = [], sourcesData = [], currentView = 'topics', currentFilter = 'all', autoRefreshTimer = null;
 
 function loadStateFromHash() {
-    const hash = window.location.hash.slice(1);
+    const hash = decodeURIComponent(window.location.hash.slice(1));
     if (hash) {
         const [view, filter] = hash.split('/');
         if (['topics', 'sources', 'filter', 'newonly', 'nav', 'report'].includes(view)) {
@@ -223,16 +254,38 @@ function saveStateToHash() {
 
 // 主题筛选状态
 let selectedTopics = []; // 格式: [{topic: '主题名', keywords: ['关键词1', '关键词2']}] 或 [{topic: '主题名', keywords: 'all'}]
+let selectedSources = []; // 来源筛选
 let filterMode = 'or'; // 'or' 或 'and'
 let expandedTopics = []; // 展开的主题列表
+let filterPanelExpanded = true; // 筛选面板展开状态
+
+// 动态生成的分类配置
+let topicCategories = [];
 
 const subTabsConfig = {
-    topics: [{ id: 'all', name: '全部' }, { id: 'ai', name: 'AI科技' }, { id: 'company', name: '企业人物' }, { id: 'world', name: '国际' }, { id: 'other', name: '其他' }],
-    sources: [{ id: 'all', name: '全部' }, { id: 'tech', name: '科技' }, { id: 'finance', name: '财经' }, { id: 'social', name: '社交' }, { id: 'news', name: '资讯' }],
+    topics: [{ id: 'all', name: '全部' }], // 初始默认值，数据加载后动态更新
+    sources: [{ id: 'all', name: '全部' }, { id: 'news', name: '新闻媒体' }, { id: 'finance', name: '财经投资' }, { id: 'social', name: '社交短视频' }, { id: 'video', name: '影视娱乐' }, { id: 'tech', name: '科技' }, { id: 'community', name: '社区论坛' }, { id: 'game', name: '游戏' }],
     filter: [],
     newonly: [],
     nav: [{ id: 'all', name: '全部主题' }], report: []
 };
+
+function updateTopicCategories() {
+    // 从 topicsData 中提取所有分类
+    const categories = new Set();
+    topicsData.forEach(t => {
+        if (t.category) categories.add(t.category);
+    });
+    topicCategories = Array.from(categories);
+    // 更新 subTabsConfig
+    subTabsConfig.topics = [{ id: 'all', name: '全部' }].concat(
+        topicCategories.map(c => ({ id: c, name: c }))
+    );
+    // 添加"其他"如果有未分类的
+    if (!categories.has('其他') && topicsData.some(t => !t.category || t.category === '其他')) {
+        subTabsConfig.topics.push({ id: '其他', name: '其他' });
+    }
+}
 
 async function loadData() {
     try {
@@ -242,6 +295,7 @@ async function loadData() {
         topicsData = topicsJson.topics || [];
         sourcesData = sourcesJson.sources || [];
         document.getElementById('updateTime').textContent = topicsJson.update_time || '未知';
+        updateTopicCategories();
         renderView();
         return true;
     } catch (e) {
@@ -283,6 +337,10 @@ async function loadDataFromHTML() {
 function renderSubTabs() {
     const tabs = subTabsConfig[currentView] || [];
     document.getElementById('subHeader').style.display = tabs.length ? 'block' : 'none';
+    // 如果当前 filter 不在 tabs 中，重置为 all
+    if (tabs.length && !tabs.find(t => t.id === currentFilter)) {
+        currentFilter = 'all';
+    }
     document.getElementById('subTabs').innerHTML = tabs.map(t => `<button class="sub-tab ${t.id === currentFilter ? 'active' : ''}" data-filter="${t.id}">${t.name}</button>`).join('');
 }
 
@@ -298,11 +356,14 @@ function renderView() {
 }
 
 function renderTopicsView(container) {
-    let topics = topicsData.map((t, i) => ({ ...t, ...(topicsMeta[i] || { icon: '📰', theme: 'purple', category: 'other' }) }));
+    let topics = topicsData.map((t, i) => {
+        const meta = topicsMeta[i] || { icon: '📰', theme: 'purple' };
+        return { ...t, icon: meta.icon, theme: meta.theme }; // 不覆盖 category
+    });
     if (currentFilter !== 'all') topics = topics.filter(t => t.category === currentFilter);
     container.innerHTML = `<div class="card-grid">${topics.map((t, idx) => `
         <div class="news-card theme-${t.theme}"><div class="card-header"><div class="card-title-wrap"><div class="card-icon" onclick="showKeywordsPopup(${idx}, event)" style="cursor:pointer" title="点击查看关键词">${t.icon}</div><div><div class="card-title">${t.name}</div><div class="card-subtitle">${t.count} 条新闻</div></div></div><span class="card-count">${t.count}</span></div>
-        <div class="news-list">${(t.news || []).map((n, i) => `<div class="news-item"><span class="news-rank ${i < 3 ? 'top-' + (i+1) : ''}">${n.rank}</span><div class="news-text"><a href="${n.url}" target="_blank" class="news-title-link">${n.title}${n.isNew ? ' <span class="news-new">NEW</span>' : ''}</a><div class="news-meta"><span class="news-source">${n.source}</span>${formatSubTags(n.matchedTopics, t.name)}</div></div></div>`).join('')}</div></div>`).join('')}</div>`;
+        <div class="news-list">${(t.news || []).map((n, i) => `<div class="news-item"><span class="news-rank ${i < 3 ? 'top-' + (i+1) : ''}">${n.rank}</span><div class="news-text"><a href="${n.url}" target="_blank" class="news-title-link">${n.title}${n.isNew ? ' <span class="news-new">NEW</span>' : ''}</a><div class="news-meta"><span class="news-source" onclick="jumpToSourceFilter('${n.source}')">${n.source}</span>${formatSubTags(n.matchedTopics, t.name)}</div></div></div>`).join('')}</div></div>`).join('')}</div>`;
 }
 
 function formatSubTags(matchedTopics, parentTopic) {
@@ -364,7 +425,7 @@ function renderSourcesView(container) {
     let sources = sourcesData.map(s => ({ ...s, ...(sourceMeta[s.name] || { icon: s.name[0], theme: 'purple', category: 'news' }) }));
     if (currentFilter !== 'all') sources = sources.filter(s => s.category === currentFilter);
     container.innerHTML = `<div class="card-grid">${sources.map(s => `
-        <div class="news-card theme-${s.theme}"><div class="card-header"><div class="card-title-wrap"><div class="card-icon">${s.icon}</div><div><div class="card-title">${s.name}</div><div class="card-subtitle">${s.category}</div></div></div><span class="card-count">${s.count}</span></div>
+        <div class="news-card theme-${s.theme}"><div class="card-header"><div class="card-title-wrap"><div class="card-icon">${s.icon}</div><div><div class="card-title" onclick="jumpToSourceFilter('${s.name}')" style="cursor:pointer">${s.name}</div><div class="card-subtitle">${s.category}</div></div></div><span class="card-count">${s.count}</span></div>
         <div class="news-list">${(s.news || []).map((n, i) => `<div class="news-item"><span class="news-rank ${i < 3 ? 'top-' + (i+1) : ''}">${i + 1}</span><div class="news-text"><a href="${n.url}" target="_blank" class="news-title-link">${n.title}${n.isNew ? ' <span class="news-new">NEW</span>' : ''}</a><div class="news-meta">${formatMatchedTopics(n.matchedTopics)}</div></div></div>`).join('')}</div></div>`).join('')}</div>`;
 }
 
@@ -399,13 +460,14 @@ function renderNewOnlyView(container) {
         return;
     }
     
-    container.innerHTML = `<div class="new-news-grid">${newNews.map((n, i) => `<div class="new-news-item"><span class="news-rank top-1">${i + 1}</span><div class="news-text"><a href="${n.url}" target="_blank" class="news-title-link">${n.title}</a><div class="news-meta"><span class="news-source">${n.sourceName}</span> ${formatMatchedTopics(n.matchedTopics)}</div></div></div>`).join('')}</div>`;
+    container.innerHTML = `<div class="new-news-grid">${newNews.map((n, i) => `<div class="new-news-item"><span class="news-rank top-1">${i + 1}</span><div class="news-text"><a href="${n.url}" target="_blank" class="news-title-link">${n.title}</a><div class="news-meta"><span class="news-source" onclick="jumpToSourceFilter('${n.sourceName}')">${n.sourceName}</span> ${formatMatchedTopics(n.matchedTopics)}</div></div></div>`).join('')}</div>`;
 }
 
 function renderFilterView(container) {
     const topics = topicsData.map((t, i) => ({ ...t, ...(topicsMeta[i] || { icon: '📰', theme: 'purple' }) }));
+    const sources = sourcesData.map(s => ({ name: s.name, ...(sourceMeta[s.name] || { icon: s.name[0], theme: 'gray' }) }));
     
-    // 收集所有新闻并去重
+    // 收集所有新闻
     const allNewsMap = new Map();
     sourcesData.forEach(source => {
         (source.news || []).forEach(n => {
@@ -415,57 +477,97 @@ function renderFilterView(container) {
         });
     });
     
-    // 根据选中的主题和关键词筛选
+    // 筛选逻辑
     let filteredNews = [];
-    if (selectedTopics.length === 0) {
+    const hasTopicFilter = selectedTopics.length > 0;
+    const hasSourceFilter = selectedSources.length > 0;
+    
+    // 只选一个主题且全选时，直接使用该主题的新闻（保持原排序）
+    if (selectedTopics.length === 1 && selectedTopics[0].keywords === 'all' && !hasSourceFilter) {
+        const topicData = topicsData.find(t => t.name === selectedTopics[0].topic);
+        if (topicData && topicData.news) {
+            filteredNews = topicData.news.map(n => ({ ...n, sourceName: n.source }));
+        }
+    } else if (!hasTopicFilter && !hasSourceFilter) {
         filteredNews = Array.from(allNewsMap.values());
     } else {
         allNewsMap.forEach(news => {
-            const newsMatches = news.matchedTopics || [];
-            const matchResults = selectedTopics.map(sel => {
-                const topicMatch = newsMatches.find(mt => mt.topic === sel.topic);
-                if (!topicMatch) return false;
-                if (sel.keywords === 'all') return true;
-                return sel.keywords.some(kw => topicMatch.matched === kw || (Array.isArray(topicMatch.matched) && topicMatch.matched.includes(kw)));
-            });
-            if (filterMode === 'or') {
-                if (matchResults.some(r => r)) filteredNews.push(news);
+            let topicMatch = true, sourceMatch = true;
+            
+            // 主题筛选
+            if (hasTopicFilter) {
+                const newsMatches = news.matchedTopics || [];
+                const matchResults = selectedTopics.map(sel => {
+                    const tm = newsMatches.find(mt => mt.topic === sel.topic);
+                    if (!tm) return false;
+                    if (sel.keywords === 'all') return true;
+                    return sel.keywords.some(kw => tm.matched === kw || (Array.isArray(tm.matched) && tm.matched.includes(kw)));
+                });
+                topicMatch = filterMode === 'or' ? matchResults.some(r => r) : matchResults.every(r => r);
+            }
+            
+            // 来源筛选
+            if (hasSourceFilter) {
+                sourceMatch = selectedSources.includes(news.sourceName);
+            }
+            
+            // 组合筛选
+            if (hasTopicFilter && hasSourceFilter) {
+                if (topicMatch && sourceMatch) filteredNews.push(news);
+            } else if (hasTopicFilter) {
+                if (topicMatch) filteredNews.push(news);
             } else {
-                if (matchResults.every(r => r)) filteredNews.push(news);
+                if (sourceMatch) filteredNews.push(news);
             }
         });
+        // 按 rank 排序（热度从高到低）
+        filteredNews.sort((a, b) => (a.rank || 999) - (b.rank || 999));
     }
     
-    // 统计选中的关键词数量
-    const selectedCount = selectedTopics.reduce((sum, t) => sum + (t.keywords === 'all' ? 1 : t.keywords.length), 0);
+    const topicCount = selectedTopics.reduce((sum, t) => sum + (t.keywords === 'all' ? 1 : t.keywords.length), 0);
+    const totalSelected = topicCount + selectedSources.length;
+    
+    // 生成筛选条件摘要
+    const topicSummary = selectedTopics.map(t => t.topic).join('、') || '无';
+    const sourceSummary = selectedSources.join('、') || '无';
     
     container.innerHTML = `
         <div class="filter-panel">
             <div class="filter-header">
-                <span class="filter-label">筛选：</span>
+                <span class="filter-toggle" onclick="toggleFilterPanel()">${filterPanelExpanded ? '▼ 收起' : '▶ 展开'}</span>
                 <div class="filter-mode">
                     <button class="mode-btn ${filterMode === 'or' ? 'active' : ''}" onclick="setFilterMode('or')">或</button>
                     <button class="mode-btn ${filterMode === 'and' ? 'active' : ''}" onclick="setFilterMode('and')">与</button>
                 </div>
-                <button class="clear-btn" onclick="clearTopicFilter()">清除</button>
-                <span class="filter-info">已选 ${selectedCount} 项，${filteredNews.length} 条结果</span>
+                <button class="clear-btn" onclick="clearAllFilter()">清除</button>
+                <span class="filter-info">${filteredNews.length} 条结果</span>
+                ${!filterPanelExpanded ? `<div class="filter-summary">主题: <span>${topicSummary}</span> | 来源: <span>${sourceSummary}</span></div>` : ''}
             </div>
-            <div class="filter-topics-row">
-                ${topics.map(t => {
-                    const sel = selectedTopics.find(s => s.topic === t.name);
-                    const isAllSelected = sel && sel.keywords === 'all';
-                    const selectedKws = sel && sel.keywords !== 'all' ? sel.keywords : [];
-                    const hasSelection = !!sel;
-                    const badgeText = isAllSelected ? '全' : (selectedKws.length > 0 ? selectedKws.length : '');
-                    return `<span class="filter-topic-chip ${hasSelection ? 'has-selection' : ''}">
-                        <span class="filter-topic-name ${isAllSelected ? 'selected' : ''}" onclick="toggleTopicAll('${t.name}')">${t.icon} ${t.name}</span>
-                        ${badgeText ? `<span class="filter-topic-badge">${badgeText}</span>` : ''}
-                        <span class="filter-topic-expand" onclick="showKwPopup(event, '${t.name}')">▼</span>
-                    </span>`;
-                }).join('')}
+            <div class="filter-body ${filterPanelExpanded ? '' : 'collapsed'}">
+                <div class="filter-header sub"><span class="filter-label">主题：</span></div>
+                <div class="filter-topics-row">
+                    ${topics.map(t => {
+                        const sel = selectedTopics.find(s => s.topic === t.name);
+                        const isAllSelected = sel && sel.keywords === 'all';
+                        const selectedKws = sel && sel.keywords !== 'all' ? sel.keywords : [];
+                        const hasSelection = !!sel;
+                        const badgeText = isAllSelected ? '全' : (selectedKws.length > 0 ? selectedKws.length : '');
+                        return `<span class="filter-topic-chip ${hasSelection ? 'has-selection' : ''}">
+                            <span class="filter-topic-name ${isAllSelected ? 'selected' : ''}" onclick="toggleTopicAll('${t.name}')">${t.icon} ${t.name}</span>
+                            ${badgeText ? `<span class="filter-topic-badge">${badgeText}</span>` : ''}
+                            <span class="filter-topic-expand" onclick="showKwPopup(event, '${t.name}')">▼</span>
+                        </span>`;
+                    }).join('')}
+                </div>
+                <div class="filter-header sub"><span class="filter-label">来源：</span></div>
+                <div class="filter-topics-row">
+                    ${sources.map(s => `<span class="filter-topic-chip ${selectedSources.includes(s.name) ? 'has-selection' : ''}" onclick="toggleSourceFilter('${s.name}')">
+                        <span class="filter-topic-name ${selectedSources.includes(s.name) ? 'selected' : ''}">${s.icon} ${s.name}</span>
+                    </span>`).join('')}
+                </div>
             </div>
         </div>
-        <div class="new-news-grid">${filteredNews.map((n, i) => `<div class="new-news-item"><span class="news-rank">${i + 1}</span><div class="news-text"><a href="${n.url}" target="_blank" class="news-title-link">${n.title}</a><div class="news-meta"><span class="news-source">${n.sourceName}</span> ${formatMatchedTopics(n.matchedTopics)}</div></div></div>`).join('')}</div>
+        <div class="new-news-grid">${filteredNews.map((n, i) => `<div class="new-news-item"><span class="news-rank">${i + 1}</span><div class="news-text"><a href="${n.url}" target="_blank" class="news-title-link">${n.title}${n.isNew ? ' <span class="news-new">NEW</span>' : ''}</a><div class="news-meta"><span class="news-source" onclick="jumpToSourceFilter('${n.sourceName}')">${n.sourceName}</span> ${formatMatchedTopics(n.matchedTopics)}</div></div></div>`).join('')}</div>
     `;
 }
 
@@ -569,6 +671,34 @@ function clearTopicFilter() {
     renderView();
 }
 
+function toggleSourceFilter(sourceName) {
+    const idx = selectedSources.indexOf(sourceName);
+    if (idx >= 0) selectedSources.splice(idx, 1);
+    else selectedSources.push(sourceName);
+    renderView();
+}
+
+function clearAllFilter() {
+    selectedTopics = [];
+    selectedSources = [];
+    renderView();
+}
+
+function toggleFilterPanel() {
+    filterPanelExpanded = !filterPanelExpanded;
+    renderView();
+}
+
+function jumpToSourceFilter(sourceName) {
+    selectedSources = [sourceName];
+    selectedTopics = [];
+    currentView = 'filter';
+    currentFilter = 'all';
+    updateMainTabs();
+    renderView();
+    saveStateToHash();
+}
+
 function renderNavView(container) {
     const topics = topicsData.map((t, i) => ({ ...t, ...(topicsMeta[i] || { icon: '📰', theme: 'purple', category: 'other' }) }));
     container.innerHTML = `<div class="topics-nav-grid">${topics.map((t, i) => `
@@ -614,13 +744,13 @@ async function triggerCrawl() {
 }
 
 document.querySelectorAll('.main-tab').forEach(tab => tab.addEventListener('click', () => { currentView = tab.dataset.view; currentFilter = 'all'; saveStateToHash(); renderView(); updateMainTabs(); }));
-document.getElementById('subTabs').addEventListener('click', e => { if (e.target.classList.contains('sub-tab')) { currentFilter = e.target.dataset.filter; saveStateToHash(); renderView(); } });
+document.getElementById('subTabs').addEventListener('click', e => { if (e.target.classList.contains('sub-tab')) { currentFilter = e.target.dataset.filter; saveStateToHash(); renderSubTabs(); renderView(); } });
 document.getElementById('refreshBtn').addEventListener('click', refreshData);
 document.getElementById('crawlBtn').addEventListener('click', triggerCrawl);
 document.getElementById('autoRefresh').addEventListener('change', setupAutoRefresh);
 window.addEventListener('hashchange', () => { loadStateFromHash(); renderView(); updateMainTabs(); });
 
-loadStateFromHash(); updateMainTabs(); loadData(); setupAutoRefresh();
+loadStateFromHash(); updateMainTabs(); loadData().then(() => { loadStateFromHash(); renderView(); updateMainTabs(); }); setupAutoRefresh();
 </script>
 </body>
 </html>
