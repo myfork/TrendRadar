@@ -79,6 +79,54 @@
         .topic-nav-stats { display: flex; justify-content: space-between; font-size: 12px; color: var(--text-secondary); padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1); }
         .topic-nav-btn { color: var(--accent); }
         .report-frame { width: 100%; height: calc(100vh - 160px); border: none; border-radius: 12px; background: white; }
+        /* 设置页面样式 */
+        .settings-container { max-width: 1200px; margin: 0 auto; }
+        .settings-tabs { display: flex; gap: 8px; margin-bottom: 16px; }
+        .settings-tab { padding: 10px 20px; border-radius: 8px; font-size: 14px; cursor: pointer; transition: all 0.2s; background: rgba(255,255,255,0.05); color: var(--text-secondary); border: none; }
+        .settings-tab:hover { background: rgba(255,255,255,0.1); color: var(--text-primary); }
+        .settings-tab.active { background: var(--accent); color: white; }
+        .settings-panel { display: none; }
+        .settings-panel.active { display: block; }
+        .settings-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .settings-header h3 { margin: 0; font-size: 18px; color: var(--text-primary); }
+        .settings-actions { display: flex; gap: 8px; }
+        .btn-primary { padding: 8px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; border: none; background: var(--accent); color: white; transition: all 0.2s; }
+        .btn-primary:hover { background: #7c3aed; }
+        .btn-secondary { padding: 8px 16px; border-radius: 6px; font-size: 13px; cursor: pointer; border: 1px solid rgba(255,255,255,0.2); background: transparent; color: var(--text-secondary); transition: all 0.2s; }
+        .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+        .settings-help { background: rgba(59,130,246,0.1); border: 1px solid rgba(59,130,246,0.3); border-radius: 8px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px; color: var(--text-secondary); }
+        .settings-help p { margin: 0 0 8px 0; }
+        .settings-help ul { margin: 0; padding-left: 20px; }
+        .settings-help li { margin: 4px 0; }
+        .settings-help code { background: rgba(255,255,255,0.1); padding: 2px 6px; border-radius: 4px; font-family: monospace; color: #a78bfa; }
+        .settings-editor { width: 100%; height: calc(100vh - 380px); min-height: 400px; background: var(--bg-card); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 16px; font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; font-size: 13px; line-height: 1.6; color: var(--text-primary); resize: vertical; }
+        .settings-editor:focus { outline: none; border-color: var(--accent); }
+        .platforms-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 8px; }
+        .platform-item { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: var(--bg-card); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; cursor: grab; transition: all 0.2s; }
+        .platform-item:hover { border-color: rgba(255,255,255,0.2); }
+        .platform-item.dragging { opacity: 0.5; border-color: var(--accent); }
+        .platform-drag { color: var(--text-secondary); font-size: 14px; cursor: grab; }
+        .platform-checkbox { display: flex; align-items: center; gap: 10px; flex: 1; cursor: pointer; }
+        .platform-checkbox input { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
+        .platform-name { font-size: 14px; color: var(--text-primary); }
+        .platform-id { font-size: 11px; color: var(--text-secondary); margin-left: auto; }
+        /* 搜索页面样式 */
+        .search-container { max-width: 900px; margin: 0 auto; }
+        .search-box { display: flex; gap: 12px; margin-bottom: 20px; }
+        .search-input { flex: 1; padding: 12px 16px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.15); background: var(--bg-card); color: var(--text-primary); font-size: 15px; }
+        .search-input:focus { outline: none; border-color: var(--accent); }
+        .search-input::placeholder { color: var(--text-secondary); }
+        .search-results { min-height: 200px; }
+        .search-hint { text-align: center; padding: 40px; color: var(--text-secondary); font-size: 14px; }
+        .search-count { padding: 12px 0; color: var(--text-secondary); font-size: 13px; border-bottom: 1px solid rgba(255,255,255,0.1); margin-bottom: 12px; }
+        .search-list { display: flex; flex-direction: column; gap: 8px; }
+        .search-item { display: flex; gap: 12px; padding: 12px 16px; background: var(--bg-card); border-radius: 8px; border: 1px solid rgba(255,255,255,0.08); }
+        .search-item:hover { border-color: rgba(255,255,255,0.15); }
+        .search-rank { min-width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.1); border-radius: 6px; font-size: 12px; color: var(--text-secondary); }
+        .search-content { flex: 1; }
+        .search-meta { margin-top: 6px; display: flex; gap: 12px; font-size: 12px; color: var(--text-secondary); }
+        .search-source { background: rgba(124,58,237,0.15); color: #a78bfa; padding: 2px 8px; border-radius: 4px; }
+        mark { background: rgba(250,204,21,0.3); color: #fcd34d; padding: 0 2px; border-radius: 2px; }
         .header-actions { display: flex; align-items: center; gap: 8px; }
         .refresh-btn { width: 36px; height: 36px; border-radius: 8px; border: none; background: rgba(255,255,255,0.1); cursor: pointer; font-size: 16px; transition: all 0.2s; }
         .refresh-btn:hover { background: rgba(255,255,255,0.2); }
@@ -114,7 +162,7 @@
         .filter-header.sub { margin-top: 10px; }
         .filter-label { font-weight: 600; color: var(--text-primary); font-size: 13px; }
         .filter-toggle { cursor: pointer; font-size: 11px; color: var(--text-secondary); padding: 3px 8px; border-radius: 4px; background: rgba(255,255,255,0.05); }
-        .filter-toggle:hover { background: rgba(255,255,255,0.1); color: var(--accent); }
+        .filter-toggle:hover { background: rgba(255,255,255,0.15); color: var(--text-primary); }
         .filter-summary { font-size: 11px; color: var(--text-secondary); flex: 1; }
         .filter-summary span { color: var(--accent); }
         .filter-body { margin-top: 10px; }
@@ -122,32 +170,33 @@
         .filter-label { font-weight: 600; color: var(--text-primary); }
         .filter-mode { display: flex; gap: 8px; }
         .mode-btn { padding: 6px 12px; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; background: transparent; color: var(--text-secondary); cursor: pointer; font-size: 12px; transition: all 0.2s; }
-        .mode-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .mode-btn:hover { background: rgba(255,255,255,0.15); color: var(--text-primary); }
         .mode-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
         .clear-btn { padding: 6px 12px; border: 1px solid rgba(239,68,68,0.5); border-radius: 6px; background: transparent; color: #ef4444; cursor: pointer; font-size: 12px; transition: all 0.2s; }
-        .clear-btn:hover { background: rgba(239,68,68,0.1); }
+        .clear-btn:hover { background: rgba(239,68,68,0.15); }
         .filter-topics-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
-        .filter-topic-chip { display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px; border: 1px solid rgba(255,255,255,0.15); border-radius: 20px; background: rgba(255,255,255,0.05); font-size: 13px; }
-        .filter-topic-chip.has-selection { background: rgba(124,58,237,0.15); border-color: rgba(124,58,237,0.4); }
+        .filter-topic-chip { display: inline-flex; align-items: center; gap: 4px; padding: 6px 10px; border: 1px solid rgba(255,255,255,0.15); border-radius: 20px; background: rgba(255,255,255,0.05); font-size: 13px; transition: all 0.2s; }
+        .filter-topic-chip:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.25); }
+        .filter-topic-chip.has-selection { background: rgba(124,58,237,0.2); border-color: var(--accent); }
         .filter-topic-name { cursor: pointer; color: var(--text-secondary); transition: all 0.2s; }
-        .filter-topic-name:hover { color: var(--accent); }
-        .filter-topic-name.selected { color: var(--accent); font-weight: 600; }
+        .filter-topic-chip:hover .filter-topic-name { color: var(--text-primary); }
+        .filter-topic-name.selected { color: white; font-weight: 600; }
         .filter-topic-expand { cursor: pointer; font-size: 10px; color: var(--text-secondary); padding: 2px 4px; border-radius: 4px; margin-left: 2px; }
-        .filter-topic-expand:hover { background: rgba(255,255,255,0.1); color: var(--accent); }
+        .filter-topic-expand:hover { background: rgba(255,255,255,0.15); color: var(--text-primary); }
         .filter-topic-badge { font-size: 10px; background: rgba(124,58,237,0.3); color: #a78bfa; padding: 1px 5px; border-radius: 8px; margin-left: 2px; }
         .kw-popup { position: fixed; z-index: 1000; background: var(--bg-card); border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); min-width: 200px; max-width: 350px; max-height: 300px; overflow: hidden; }
         .kw-popup-header { display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-bottom: 1px solid rgba(255,255,255,0.1); }
         .kw-popup-title { font-weight: 600; font-size: 13px; }
         .kw-popup-actions { display: flex; gap: 8px; }
-        .kw-popup-btn { font-size: 11px; padding: 3px 8px; border-radius: 4px; cursor: pointer; border: 1px solid rgba(255,255,255,0.2); background: transparent; color: var(--text-secondary); }
-        .kw-popup-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .kw-popup-btn { font-size: 11px; padding: 3px 8px; border-radius: 4px; cursor: pointer; border: 1px solid rgba(255,255,255,0.2); background: transparent; color: var(--text-secondary); transition: all 0.2s; }
+        .kw-popup-btn:hover { background: rgba(255,255,255,0.15); color: var(--text-primary); }
         .kw-popup-btn.active { background: var(--accent); border-color: var(--accent); color: white; }
         .kw-popup-close { cursor: pointer; font-size: 18px; color: var(--text-secondary); padding: 0 4px; }
         .kw-popup-close:hover { color: var(--text-primary); }
         .kw-popup-content { padding: 10px 14px; display: flex; flex-wrap: wrap; gap: 6px; max-height: 220px; overflow-y: auto; }
-        .kw-item { padding: 4px 10px; border: 1px solid rgba(255,255,255,0.1); border-radius: 14px; font-size: 12px; color: var(--text-secondary); cursor: pointer; transition: all 0.2s; }
-        .kw-item:hover { border-color: var(--accent); color: var(--accent); }
-        .kw-item.selected { background: rgba(124,58,237,0.3); border-color: var(--accent); color: #a78bfa; }
+        .kw-item { padding: 4px 10px; border: 1px solid rgba(255,255,255,0.15); border-radius: 14px; font-size: 12px; color: var(--text-secondary); cursor: pointer; transition: all 0.2s; }
+        .kw-item:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.25); color: var(--text-primary); }
+        .kw-item.selected { background: rgba(124,58,237,0.3); border-color: var(--accent); color: white; }
         .filter-info { font-size: 12px; color: var(--text-secondary); }
         @media (max-width: 900px) { .new-news-grid { grid-template-columns: 1fr; } }
     </style>
@@ -158,11 +207,14 @@
         <div class="logo"><div class="logo-icon">📡</div><span class="logo-text">TrendRadar</span><span class="logo-version">v1.0</span></div>
         <nav class="main-tabs">
             <button class="main-tab active" data-view="topics">主题聚合</button>
-            <button class="main-tab" data-view="sources">来源聚合</button>
-            <button class="main-tab" data-view="filter">筛选</button>
             <button class="main-tab" data-view="newonly">增量新闻</button>
-            <button class="main-tab" data-view="nav">主题导航</button>
+            <button class="main-tab" data-view="sources">来源聚合</button>
             <button class="main-tab" data-view="report">原始报告</button>
+            <button class="main-tab" data-view="nav">主题导航</button>
+            <button class="main-tab" data-view="filter">筛选</button>
+            <button class="main-tab" data-view="search">搜索</button>
+            <button class="main-tab" data-view="allnews">全部新闻</button>
+            <button class="main-tab" data-view="settings">设置</button>
         </nav>
         <div class="header-actions">
             <span class="update-time-header">更新: <span id="updateTime">加载中...</span></span>
@@ -241,7 +293,7 @@ function loadStateFromHash() {
     const hash = decodeURIComponent(window.location.hash.slice(1));
     if (hash) {
         const [view, filter] = hash.split('/');
-        if (['topics', 'sources', 'filter', 'newonly', 'nav', 'report'].includes(view)) {
+        if (['topics', 'sources', 'allnews', 'search', 'filter', 'newonly', 'nav', 'report', 'settings'].includes(view)) {
             currentView = view;
             currentFilter = filter || 'all';
         }
@@ -265,9 +317,11 @@ let topicCategories = [];
 const subTabsConfig = {
     topics: [{ id: 'all', name: '全部' }], // 初始默认值，数据加载后动态更新
     sources: [{ id: 'all', name: '全部' }, { id: 'news', name: '新闻媒体' }, { id: 'finance', name: '财经投资' }, { id: 'social', name: '社交短视频' }, { id: 'video', name: '影视娱乐' }, { id: 'tech', name: '科技' }, { id: 'community', name: '社区论坛' }, { id: 'game', name: '游戏' }],
+    allnews: [{ id: 'all', name: '全部' }, { id: 'news', name: '新闻媒体' }, { id: 'finance', name: '财经投资' }, { id: 'social', name: '社交短视频' }, { id: 'video', name: '影视娱乐' }, { id: 'tech', name: '科技' }, { id: 'community', name: '社区论坛' }, { id: 'game', name: '游戏' }],
+    search: [],
     filter: [],
     newonly: [],
-    nav: [{ id: 'all', name: '全部主题' }], report: []
+    nav: [{ id: 'all', name: '全部主题' }], report: [], settings: []
 };
 
 function updateTopicCategories() {
@@ -349,10 +403,13 @@ function renderView() {
     const container = document.getElementById('viewContainer');
     if (currentView === 'topics') renderTopicsView(container);
     else if (currentView === 'sources') renderSourcesView(container);
+    else if (currentView === 'allnews') renderAllNewsView(container);
+    else if (currentView === 'search') renderSearchView(container);
     else if (currentView === 'filter') renderFilterView(container);
     else if (currentView === 'newonly') renderNewOnlyView(container);
     else if (currentView === 'nav') renderNavView(container);
     else if (currentView === 'report') container.innerHTML = '<iframe src="index.html" class="report-frame"></iframe>';
+    else if (currentView === 'settings') renderSettingsView(container);
 }
 
 function renderTopicsView(container) {
@@ -427,6 +484,98 @@ function renderSourcesView(container) {
     container.innerHTML = `<div class="card-grid">${sources.map(s => `
         <div class="news-card theme-${s.theme}"><div class="card-header"><div class="card-title-wrap"><div class="card-icon">${s.icon}</div><div><div class="card-title" onclick="jumpToSourceFilter('${s.name}')" style="cursor:pointer">${s.name}</div><div class="card-subtitle">${s.category}</div></div></div><span class="card-count">${s.count}</span></div>
         <div class="news-list">${(s.news || []).map((n, i) => `<div class="news-item"><span class="news-rank ${i < 3 ? 'top-' + (i+1) : ''}">${i + 1}</span><div class="news-text"><a href="${n.url}" target="_blank" class="news-title-link">${n.title}${n.isNew ? ' <span class="news-new">NEW</span>' : ''}</a><div class="news-meta">${formatMatchedTopics(n.matchedTopics)}</div></div></div>`).join('')}</div></div>`).join('')}</div>`;
+}
+
+// 全部新闻数据缓存
+let allNewsData = { sources: [], total: 0, loaded: false };
+
+async function renderAllNewsView(container) {
+    container.innerHTML = '<div class="loading">加载全部新闻...</div>';
+    
+    if (!allNewsData.loaded) {
+        try {
+            const res = await fetch('/api/allnews');
+            const data = await res.json();
+            if (data.success) {
+                allNewsData.sources = data.sources;
+                allNewsData.total = data.total;
+                allNewsData.loaded = true;
+            } else {
+                container.innerHTML = `<div class="loading">加载失败: ${data.error}</div>`;
+                return;
+            }
+        } catch (e) {
+            container.innerHTML = `<div class="loading">加载失败: ${e.message}</div>`;
+            return;
+        }
+    }
+    
+    let sources = allNewsData.sources.map(s => ({ ...s, ...(sourceMeta[s.name] || { icon: s.name[0], theme: 'purple', category: 'news' }) }));
+    if (currentFilter !== 'all') sources = sources.filter(s => s.category === currentFilter);
+    
+    container.innerHTML = `<div class="update-info">共 ${allNewsData.total} 条新闻，${allNewsData.sources.length} 个来源（数据来自数据库，未经关键词过滤）</div>
+    <div class="card-grid">${sources.map(s => `
+        <div class="news-card theme-${s.theme}"><div class="card-header"><div class="card-title-wrap"><div class="card-icon">${s.icon}</div><div><div class="card-title">${s.name}</div><div class="card-subtitle">${s.count} 条</div></div></div><span class="card-count">${s.count}</span></div>
+        <div class="news-list">${(s.news || []).map((n, i) => `<div class="news-item"><span class="news-rank ${n.rank <= 3 ? 'top-' + n.rank : ''}">${n.rank}</span><div class="news-text"><a href="${n.url}" target="_blank" class="news-title-link">${n.title}</a></div></div>`).join('')}</div></div>`).join('')}</div>`;
+}
+
+// 搜索相关
+let searchResults = { keyword: '', results: [], count: 0 };
+
+function renderSearchView(container) {
+    container.innerHTML = `<div class="search-container">
+        <div class="search-box">
+            <input type="text" id="searchInput" class="search-input" placeholder="输入关键词搜索全部新闻..." value="${searchResults.keyword}" onkeypress="if(event.key==='Enter')doSearch()">
+            <button class="btn-primary" onclick="doSearch()">搜索</button>
+        </div>
+        <div id="searchResults" class="search-results">
+            ${searchResults.results.length > 0 ? renderSearchResults() : '<div class="search-hint">输入关键词后点击搜索，将在今日全部新闻中查找</div>'}
+        </div>
+    </div>`;
+}
+
+function renderSearchResults() {
+    if (searchResults.results.length === 0) {
+        return `<div class="search-hint">未找到包含 "${searchResults.keyword}" 的新闻</div>`;
+    }
+    return `<div class="search-count">找到 ${searchResults.count} 条包含 "${searchResults.keyword}" 的新闻</div>
+    <div class="search-list">${searchResults.results.map((n, i) => `
+        <div class="search-item">
+            <span class="search-rank">${i + 1}</span>
+            <div class="search-content">
+                <a href="${n.url}" target="_blank" class="news-title-link">${highlightKeyword(n.title, searchResults.keyword)}</a>
+                <div class="search-meta"><span class="search-source">${n.source}</span><span class="search-original-rank">原排名: ${n.rank}</span></div>
+            </div>
+        </div>
+    `).join('')}</div>`;
+}
+
+function highlightKeyword(text, keyword) {
+    if (!keyword) return text;
+    const regex = new RegExp(`(${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+    return text.replace(regex, '<mark>$1</mark>');
+}
+
+async function doSearch() {
+    const input = document.getElementById('searchInput');
+    const keyword = input.value.trim();
+    if (!keyword) { alert('请输入搜索关键词'); return; }
+    
+    const resultsDiv = document.getElementById('searchResults');
+    resultsDiv.innerHTML = '<div class="loading">搜索中...</div>';
+    
+    try {
+        const res = await fetch('/api/search?q=' + encodeURIComponent(keyword));
+        const data = await res.json();
+        if (data.success) {
+            searchResults = { keyword: data.keyword, results: data.results, count: data.count };
+            resultsDiv.innerHTML = renderSearchResults();
+        } else {
+            resultsDiv.innerHTML = `<div class="search-hint">搜索失败: ${data.error}</div>`;
+        }
+    } catch (e) {
+        resultsDiv.innerHTML = `<div class="search-hint">搜索失败: ${e.message}</div>`;
+    }
 }
 
 function formatMatchedTopics(matchedTopics) {
@@ -562,7 +711,7 @@ function renderFilterView(container) {
                 <div class="filter-header sub"><span class="filter-label">来源：</span></div>
                 <div class="filter-topics-row">
                     ${sources.map(s => `<span class="filter-topic-chip ${selectedSources.includes(s.name) ? 'has-selection' : ''}" onclick="toggleSourceFilter('${s.name}')">
-                        <span class="filter-topic-name ${selectedSources.includes(s.name) ? 'selected' : ''}">${s.icon} ${s.name}</span>
+                        <span class="filter-topic-name ${selectedSources.includes(s.name) ? 'selected' : ''}">${s.name}</span>
                     </span>`).join('')}
                 </div>
             </div>
@@ -705,9 +854,177 @@ function renderNavView(container) {
         <div class="topic-nav-card" onclick="switchToTopic(${i})"><div class="topic-nav-header"><div class="topic-nav-icon card-icon theme-${t.theme}" style="background:linear-gradient(135deg,var(--accent),#3b82f6)">${t.icon}</div><div><div class="topic-nav-title">${t.name}</div><div class="topic-nav-keywords">${t.count} 条新闻</div></div></div><div class="topic-nav-stats"><span>${t.category}</span><span class="topic-nav-btn">查看详情 →</span></div></div>`).join('')}</div>`;
 }
 
+// 设置页面相关变量
+let settingsData = { frequencyWords: '', platforms: [] };
+
+async function renderSettingsView(container) {
+    container.innerHTML = `<div class="settings-container">
+        <div class="settings-tabs">
+            <button class="settings-tab active" data-tab="topics">主题关键词</button>
+            <button class="settings-tab" data-tab="platforms">来源管理</button>
+        </div>
+        <div class="settings-content">
+            <div id="settingsTopics" class="settings-panel active">
+                <div class="settings-header">
+                    <h3>主题关键词配置</h3>
+                    <div class="settings-actions">
+                        <button class="btn-secondary" onclick="loadFrequencyWords()">刷新</button>
+                        <button class="btn-primary" onclick="saveFrequencyWords()">保存</button>
+                    </div>
+                </div>
+                <div class="settings-help">
+                    <p><strong>格式说明：</strong></p>
+                    <ul>
+                        <li><code>#主题名 @分类名</code> - 定义主题和分类</li>
+                        <li><code>关键词1, 关键词2</code> - 普通关键词（逗号分隔）</li>
+                        <li><code>+必须词</code> - 必须包含的词</li>
+                        <li><code>-过滤词</code> - 排除包含此词的新闻</li>
+                        <li><code>空行</code> - 分隔不同主题</li>
+                    </ul>
+                </div>
+                <textarea id="frequencyWordsEditor" class="settings-editor" placeholder="加载中..."></textarea>
+            </div>
+            <div id="settingsPlatforms" class="settings-panel">
+                <div class="settings-header">
+                    <h3>来源管理</h3>
+                    <div class="settings-actions">
+                        <button class="btn-secondary" onclick="loadPlatforms()">刷新</button>
+                        <button class="btn-primary" onclick="savePlatforms()">保存</button>
+                    </div>
+                </div>
+                <div class="settings-help">
+                    <p>勾选启用的新闻来源，取消勾选可临时禁用。拖拽可调整顺序。</p>
+                </div>
+                <div id="platformsList" class="platforms-list">加载中...</div>
+            </div>
+        </div>
+    </div>`;
+    
+    // 绑定标签切换
+    container.querySelectorAll('.settings-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            container.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
+            container.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
+            tab.classList.add('active');
+            document.getElementById('settings' + tab.dataset.tab.charAt(0).toUpperCase() + tab.dataset.tab.slice(1)).classList.add('active');
+        });
+    });
+    
+    // 加载数据
+    loadFrequencyWords();
+    loadPlatforms();
+}
+
+async function loadFrequencyWords() {
+    try {
+        const res = await fetch('/api/config/frequency_words');
+        const data = await res.json();
+        if (data.success) {
+            settingsData.frequencyWords = data.content;
+            document.getElementById('frequencyWordsEditor').value = data.content;
+        } else {
+            alert('加载失败: ' + data.error);
+        }
+    } catch (e) {
+        alert('加载失败: ' + e.message);
+    }
+}
+
+async function saveFrequencyWords() {
+    const content = document.getElementById('frequencyWordsEditor').value;
+    try {
+        const res = await fetch('/api/config/frequency_words', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ content })
+        });
+        const data = await res.json();
+        if (data.success) {
+            alert('保存成功！主题配置已更新。');
+            settingsData.frequencyWords = content;
+        } else {
+            alert('保存失败: ' + data.error);
+        }
+    } catch (e) {
+        alert('保存失败: ' + e.message);
+    }
+}
+
+async function loadPlatforms() {
+    try {
+        const res = await fetch('/api/config/platforms');
+        const data = await res.json();
+        if (data.success) {
+            settingsData.platforms = data.platforms;
+            renderPlatformsList(data.platforms);
+        } else {
+            alert('加载失败: ' + data.error);
+        }
+    } catch (e) {
+        alert('加载失败: ' + e.message);
+    }
+}
+
+function renderPlatformsList(platforms) {
+    const container = document.getElementById('platformsList');
+    if (!container) return;
+    container.innerHTML = platforms.map((p, i) => `
+        <div class="platform-item" draggable="true" data-index="${i}">
+            <span class="platform-drag">☰</span>
+            <label class="platform-checkbox">
+                <input type="checkbox" checked data-id="${p.id}">
+                <span class="platform-name">${p.name}</span>
+                <span class="platform-id">${p.id}</span>
+            </label>
+        </div>
+    `).join('');
+    
+    // 拖拽排序
+    let draggedItem = null;
+    container.querySelectorAll('.platform-item').forEach(item => {
+        item.addEventListener('dragstart', e => { draggedItem = item; item.classList.add('dragging'); });
+        item.addEventListener('dragend', () => { draggedItem.classList.remove('dragging'); draggedItem = null; });
+        item.addEventListener('dragover', e => { e.preventDefault(); if (draggedItem && draggedItem !== item) {
+            const rect = item.getBoundingClientRect();
+            const next = e.clientY - rect.top > rect.height / 2;
+            container.insertBefore(draggedItem, next ? item.nextSibling : item);
+        }});
+    });
+}
+
+async function savePlatforms() {
+    const container = document.getElementById('platformsList');
+    const platforms = [];
+    container.querySelectorAll('.platform-item').forEach(item => {
+        const checkbox = item.querySelector('input[type="checkbox"]');
+        if (checkbox.checked) {
+            const id = checkbox.dataset.id;
+            const name = item.querySelector('.platform-name').textContent;
+            platforms.push({ id, name });
+        }
+    });
+    
+    try {
+        const res = await fetch('/api/config/platforms', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ platforms })
+        });
+        const data = await res.json();
+        if (data.success) {
+            alert('保存成功！来源配置已更新。下次爬取将使用新配置。');
+            settingsData.platforms = platforms;
+        } else {
+            alert('保存失败: ' + data.error);
+        }
+    } catch (e) {
+        alert('保存失败: ' + e.message);
+    }
+}
+
 function switchToTopic(idx) { currentView = 'topics'; currentFilter = topicsMeta[idx]?.category || 'all'; renderView(); updateMainTabs(); }
 function updateMainTabs() { document.querySelectorAll('.main-tab').forEach(t => t.classList.toggle('active', t.dataset.view === currentView)); }
-function refreshData() { const btn = document.getElementById('refreshBtn'); btn.classList.add('loading'); loadData().finally(() => btn.classList.remove('loading')); }
+function refreshData() { const btn = document.getElementById('refreshBtn'); btn.classList.add('loading'); allNewsData.loaded = false; loadData().finally(() => btn.classList.remove('loading')); }
 function setupAutoRefresh() { const interval = parseInt(document.getElementById('autoRefresh').value) * 1000; if (autoRefreshTimer) clearInterval(autoRefreshTimer); if (interval > 0) autoRefreshTimer = setInterval(refreshData, interval); }
 
 async function triggerCrawl() {

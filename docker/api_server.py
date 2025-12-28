@@ -8,6 +8,7 @@ TrendRadar API Server - 独立的 JSON API 服务
   - 缓存机制：启动时解析 index.html 生成 JSON 缓存
   - 自动更新：监听 index.html 文件变化，自动更新缓存
   - 静态文件：同时提供 output 目录的静态文件服务
+  - 配置管理：支持在线编辑 config.yaml 和 frequency_words.txt
 
 使用方法:
   python api_server.py [port]
@@ -18,6 +19,10 @@ API 端点:
   GET /api/sources  - 获取按来源聚合的新闻
   GET /api/status   - 获取系统状态
   GET /api/refresh  - 手动刷新缓存
+  GET /api/config/frequency_words - 获取频率词配置
+  POST /api/config/frequency_words - 保存频率词配置
+  GET /api/config/platforms - 获取平台配置
+  POST /api/config/platforms - 保存平台配置
 """
 
 import json
@@ -26,6 +31,7 @@ import re
 import sys
 import threading
 import time
+import yaml
 from datetime import datetime
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
@@ -45,6 +51,9 @@ except ImportError as e:
 API_PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8081
 OUTPUT_DIR = Path(__file__).parent.parent / "output"
 STATIC_DIR = Path(__file__).parent  # docker 目录，存放 app.html 模板
+CONFIG_DIR = Path("/app/config") if Path("/app/config").exists() else Path(__file__).parent.parent / "config"
+FREQUENCY_WORDS_FILE = CONFIG_DIR / "frequency_words.txt"
+CONFIG_YAML_FILE = CONFIG_DIR / "config.yaml"
 
 # 全局缓存
 cache = {
@@ -363,6 +372,152 @@ class APIHandler(SimpleHTTPRequestHandler):
         threading.Thread(target=run_crawl, daemon=True).start()
         return {"success": True, "message": "爬虫任务已启动"}
     
+    def get_all_news(self):
+        """从数据库获取全部新闻（不过滤关键词），按配置的来源顺序排列"""
+        import sqlite3
+        
+        # 获取今天的数据库路径
+        today = datetime.now().strftime("%Y-%m-%d")
+        db_path = OUTPUT_DIR / today / "news.db"
+        
+        if not db_path.exists():
+            return {"success": False, "error": "今日数据库不存在", "sources": []}
+        
+        try:
+            # 读取平台配置顺序
+            platform_order = {}
+            if CONFIG_YAML_FILE.exists():
+                with open(CONFIG_YAML_FILE, 'r', encoding='utf-8') as f:
+                    config = yaml.safe_load(f)
+                platforms_config = config.get('platforms', [])
+                for i, p in enumerate(platforms_config):
+                    platform_order[p['id']] = {'order': i, 'name': p['name']}
+            
+            conn = sqlite3.connect(str(db_path))
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            # 查询所有新闻，按平台和排名分组
+            cursor.execute("""
+                SELECT n.title, n.url, n.rank, n.platform_id, p.name as platform_name,
+                       n.first_crawl_time, n.last_crawl_time
+                FROM news_items n
+                LEFT JOIN platforms p ON n.platform_id = p.id
+                ORDER BY n.platform_id, n.rank
+            """)
+            
+            rows = cursor.fetchall()
+            conn.close()
+            
+            # 按来源分组
+            sources_dict = {}
+            for row in rows:
+                platform_id = row['platform_id']
+                platform_name = row['platform_name'] or platform_id
+                
+                # 使用配置中的名称（如果有）
+                if platform_id in platform_order:
+                    platform_name = platform_order[platform_id]['name']
+                
+                if platform_name not in sources_dict:
+                    sources_dict[platform_name] = {
+                        'id': platform_id,
+                        'name': platform_name,
+                        'order': platform_order.get(platform_id, {}).get('order', 999),
+                        'news': []
+                    }
+                
+                sources_dict[platform_name]['news'].append({
+                    'title': row['title'],
+                    'url': row['url'],
+                    'rank': row['rank']
+                })
+            
+            # 按配置顺序排序
+            sources_list = sorted(sources_dict.values(), key=lambda x: x['order'])
+            
+            # 添加 count 并移除 order 字段
+            for s in sources_list:
+                s['count'] = len(s['news'])
+                del s['order']
+            
+            return {
+                "success": True,
+                "update_time": cache.get("update_time", ""),
+                "sources": sources_list,
+                "total": sum(s['count'] for s in sources_list)
+            }
+            
+        except Exception as e:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] get_all_news error: {e}")
+            import traceback
+            traceback.print_exc()
+            return {"success": False, "error": str(e), "sources": []}
+    
+    def search_news(self, keyword):
+        """搜索新闻"""
+        import sqlite3
+        
+        if not keyword or not keyword.strip():
+            return {"success": False, "error": "请输入搜索关键词", "results": []}
+        
+        keyword = keyword.strip()
+        
+        # 获取今天的数据库路径
+        today = datetime.now().strftime("%Y-%m-%d")
+        db_path = OUTPUT_DIR / today / "news.db"
+        
+        if not db_path.exists():
+            return {"success": False, "error": "今日数据库不存在", "results": []}
+        
+        try:
+            # 读取平台配置
+            platform_names = {}
+            if CONFIG_YAML_FILE.exists():
+                with open(CONFIG_YAML_FILE, 'r', encoding='utf-8') as f:
+                    config = yaml.safe_load(f)
+                for p in config.get('platforms', []):
+                    platform_names[p['id']] = p['name']
+            
+            conn = sqlite3.connect(str(db_path))
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
+            
+            # 搜索标题包含关键词的新闻
+            cursor.execute("""
+                SELECT n.title, n.url, n.rank, n.platform_id, p.name as platform_name
+                FROM news_items n
+                LEFT JOIN platforms p ON n.platform_id = p.id
+                WHERE n.title LIKE ?
+                ORDER BY n.rank
+                LIMIT 200
+            """, (f'%{keyword}%',))
+            
+            rows = cursor.fetchall()
+            conn.close()
+            
+            results = []
+            for row in rows:
+                platform_id = row['platform_id']
+                platform_name = platform_names.get(platform_id, row['platform_name'] or platform_id)
+                results.append({
+                    'title': row['title'],
+                    'url': row['url'],
+                    'rank': row['rank'],
+                    'source': platform_name
+                })
+            
+            return {
+                "success": True,
+                "keyword": keyword,
+                "count": len(results),
+                "results": results
+            }
+            
+        except Exception as e:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] search_news error: {e}")
+            return {"success": False, "error": str(e), "results": []}
+    
     def send_json(self, data, status=200):
         self.send_response(status)
         self.send_header('Content-Type', 'application/json; charset=utf-8')
@@ -409,11 +564,108 @@ class APIHandler(SimpleHTTPRequestHandler):
                 "message": APIHandler.crawl_status["message"]
             })
         
+        elif path == '/api/config/frequency_words':
+            # 获取频率词配置
+            try:
+                if FREQUENCY_WORDS_FILE.exists():
+                    content = FREQUENCY_WORDS_FILE.read_text(encoding='utf-8')
+                    self.send_json({"success": True, "content": content})
+                else:
+                    self.send_json({"success": False, "error": "文件不存在"}, 404)
+            except Exception as e:
+                self.send_json({"success": False, "error": str(e)}, 500)
+        
+        elif path == '/api/config/platforms':
+            # 获取平台配置
+            try:
+                if CONFIG_YAML_FILE.exists():
+                    with open(CONFIG_YAML_FILE, 'r', encoding='utf-8') as f:
+                        config = yaml.safe_load(f)
+                    platforms = config.get('platforms', [])
+                    self.send_json({"success": True, "platforms": platforms})
+                else:
+                    self.send_json({"success": False, "error": "配置文件不存在"}, 404)
+            except Exception as e:
+                self.send_json({"success": False, "error": str(e)}, 500)
+        
+        elif path == '/api/allnews':
+            # 获取全部新闻（从数据库读取，不过滤关键词）
+            self.send_json(self.get_all_news())
+        
+        elif path.startswith('/api/search'):
+            # 搜索新闻
+            from urllib.parse import parse_qs
+            query_string = urlparse(self.path).query
+            params = parse_qs(query_string)
+            keyword = params.get('q', [''])[0]
+            self.send_json(self.search_news(keyword))
+        
         elif path.startswith('/api/'):
             self.send_json({"error": "Unknown API endpoint"}, 404)
         
         else:
             super().do_GET()
+    
+    def do_POST(self):
+        """处理 POST 请求"""
+        path = urlparse(self.path).path
+        content_length = int(self.headers.get('Content-Length', 0))
+        post_data = self.rfile.read(content_length).decode('utf-8')
+        
+        if path == '/api/config/frequency_words':
+            # 保存频率词配置
+            try:
+                data = json.loads(post_data)
+                content = data.get('content', '')
+                # 备份原文件
+                if FREQUENCY_WORDS_FILE.exists():
+                    backup_file = FREQUENCY_WORDS_FILE.with_suffix('.txt.bak')
+                    backup_file.write_text(FREQUENCY_WORDS_FILE.read_text(encoding='utf-8'), encoding='utf-8')
+                # 写入新内容
+                FREQUENCY_WORDS_FILE.write_text(content, encoding='utf-8')
+                # 清除频率词缓存，强制重新加载
+                frequency_cache["last_modified"] = 0
+                # 刷新数据缓存
+                refresh_cache()
+                self.send_json({"success": True, "message": "保存成功"})
+            except Exception as e:
+                self.send_json({"success": False, "error": str(e)}, 500)
+        
+        elif path == '/api/config/platforms':
+            # 保存平台配置
+            try:
+                data = json.loads(post_data)
+                platforms = data.get('platforms', [])
+                
+                if CONFIG_YAML_FILE.exists():
+                    # 读取现有配置
+                    with open(CONFIG_YAML_FILE, 'r', encoding='utf-8') as f:
+                        config = yaml.safe_load(f) or {}
+                    # 备份
+                    backup_file = CONFIG_YAML_FILE.with_suffix('.yaml.bak')
+                    with open(backup_file, 'w', encoding='utf-8') as f:
+                        yaml.dump(config, f, allow_unicode=True, default_flow_style=False)
+                    # 更新 platforms
+                    config['platforms'] = platforms
+                    # 写入
+                    with open(CONFIG_YAML_FILE, 'w', encoding='utf-8') as f:
+                        yaml.dump(config, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+                    self.send_json({"success": True, "message": "保存成功"})
+                else:
+                    self.send_json({"success": False, "error": "配置文件不存在"}, 404)
+            except Exception as e:
+                self.send_json({"success": False, "error": str(e)}, 500)
+        
+        else:
+            self.send_json({"error": "Unknown API endpoint"}, 404)
+    
+    def do_OPTIONS(self):
+        """处理 CORS 预检请求"""
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
     
     def log_message(self, format, *args):
         if '/api/' in args[0]:
