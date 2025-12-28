@@ -111,3 +111,15 @@ ai
 宇宙
 飞船
 航空
+
+人工智能
+AI
+ChatGPT
+openai
+sora
+claude
+Anthropic
+gemini
+deepmind
+droid
+
