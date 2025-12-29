@@ -26,6 +26,7 @@
         .main { padding: 20px; max-width: 1800px; margin: 0 auto; }
         .update-info { text-align: center; padding: 12px; color: var(--text-secondary); font-size: 12px; }
         .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
+        .card-grid.single-row .news-card { height: calc(100vh - 220px); min-height: 420px; }
         .news-card { background: var(--bg-card); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; height: 420px; transition: transform 0.2s, box-shadow 0.2s; }
         .news-card:hover { transform: translateY(-3px); box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
         .card-header { padding: 14px; display: flex; justify-content: space-between; align-items: center; }
@@ -131,9 +132,9 @@
         .refresh-btn { width: 36px; height: 36px; border-radius: 8px; border: none; background: rgba(255,255,255,0.1); cursor: pointer; font-size: 16px; transition: all 0.2s; }
         .refresh-btn:hover { background: rgba(255,255,255,0.2); }
         .refresh-btn.loading { animation: spin 1s linear infinite; }
-        .crawl-btn { padding: 8px 14px; border-radius: 8px; border: none; background: linear-gradient(135deg, #7c3aed, #3b82f6); color: white; cursor: pointer; font-size: 13px; font-weight: 500; transition: all 0.2s; min-width: 80px; height: 36px; line-height: 1; }
-        .crawl-btn:hover { opacity: 0.9; transform: scale(1.02); }
-        .crawl-btn.loading { opacity: 0.7; cursor: not-allowed; }
+        .crawl-btn { padding: 0; border-radius: 8px; border: none; background: linear-gradient(135deg, #7c3aed, #3b82f6); color: white; cursor: pointer; font-size: 13px; font-weight: 500; transition: opacity 0.2s; width: 100px; height: 36px; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center; }
+        .crawl-btn:hover { opacity: 0.9; }
+        .crawl-btn.loading { opacity: 0.7; cursor: not-allowed; padding: 0; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .auto-refresh-select { padding: 8px 12px; border-radius: 8px; border: none; background: rgba(255,255,255,0.1); color: var(--text-primary); font-size: 12px; cursor: pointer; }
         .auto-refresh-select option { background: var(--bg-secondary); }
@@ -198,6 +199,8 @@
         .kw-item:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.25); color: var(--text-primary); }
         .kw-item.selected { background: rgba(124,58,237,0.3); border-color: var(--accent); color: white; }
         .filter-info { font-size: 12px; color: var(--text-secondary); }
+        .toast { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: rgba(34,197,94,0.95); color: white; padding: 16px 32px; border-radius: 12px; font-size: 16px; font-weight: 600; z-index: 9999; box-shadow: 0 10px 40px rgba(0,0,0,0.3); animation: toastIn 0.3s ease; }
+        @keyframes toastIn { from { opacity: 0; transform: translate(-50%, -50%) scale(0.8); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
         @media (max-width: 900px) { .new-news-grid { grid-template-columns: 1fr; } }
     </style>
 </head>
@@ -410,6 +413,26 @@ function renderView() {
     else if (currentView === 'nav') renderNavView(container);
     else if (currentView === 'report') container.innerHTML = '<iframe src="index.html" class="report-frame"></iframe>';
     else if (currentView === 'settings') renderSettingsView(container);
+    // 检测单行布局并调整高度
+    setTimeout(adjustSingleRowLayout, 50);
+}
+
+function adjustSingleRowLayout() {
+    const grid = document.querySelector('.card-grid');
+    if (!grid) return;
+    const cards = grid.querySelectorAll('.news-card');
+    if (cards.length === 0) return;
+    // 获取第一个卡片的位置
+    const firstCardTop = cards[0].getBoundingClientRect().top;
+    // 检查是否所有卡片都在同一行
+    let isSingleRow = true;
+    for (let i = 1; i < cards.length; i++) {
+        if (Math.abs(cards[i].getBoundingClientRect().top - firstCardTop) > 10) {
+            isSingleRow = false;
+            break;
+        }
+    }
+    grid.classList.toggle('single-row', isSingleRow);
 }
 
 function renderTopicsView(container) {
@@ -855,16 +878,57 @@ function renderNavView(container) {
 }
 
 // 设置页面相关变量
-let settingsData = { frequencyWords: '', platforms: [] };
+let settingsData = { frequencyWords: '', platforms: [], tabs: [] };
+
+// 默认模块配置
+const defaultTabs = [
+    { id: 'topics', name: '主题聚合', enabled: true },
+    { id: 'newonly', name: '增量新闻', enabled: true },
+    { id: 'sources', name: '来源聚合', enabled: true },
+    { id: 'report', name: '原始报告', enabled: true },
+    { id: 'nav', name: '主题导航', enabled: true },
+    { id: 'filter', name: '筛选', enabled: true },
+    { id: 'search', name: '搜索', enabled: true },
+    { id: 'allnews', name: '全部新闻', enabled: true },
+    { id: 'settings', name: '设置', enabled: true }
+];
 
 async function renderSettingsView(container) {
     container.innerHTML = `<div class="settings-container">
         <div class="settings-tabs">
-            <button class="settings-tab active" data-tab="topics">主题关键词</button>
-            <button class="settings-tab" data-tab="platforms">来源管理</button>
+            <button class="settings-tab active" data-tab="platforms">来源排序</button>
+            <button class="settings-tab" data-tab="topicsorder">主题排序</button>
+            <button class="settings-tab" data-tab="topics">主题关键词</button>
+            <button class="settings-tab" data-tab="tabs">模块排序</button>
         </div>
         <div class="settings-content">
-            <div id="settingsTopics" class="settings-panel active">
+            <div id="settingsPlatforms" class="settings-panel active">
+                <div class="settings-header">
+                    <h3>来源排序</h3>
+                    <div class="settings-actions">
+                        <button class="btn-secondary" onclick="loadPlatforms()">刷新</button>
+                        <button class="btn-primary" onclick="savePlatforms()">保存</button>
+                    </div>
+                </div>
+                <div class="settings-help">
+                    <p>勾选启用的新闻来源，取消勾选可临时禁用。拖拽可调整顺序。</p>
+                </div>
+                <div id="platformsList" class="platforms-list">加载中...</div>
+            </div>
+            <div id="settingsTopicsorder" class="settings-panel">
+                <div class="settings-header">
+                    <h3>主题排序</h3>
+                    <div class="settings-actions">
+                        <button class="btn-secondary" onclick="loadTopicsOrder()">刷新</button>
+                        <button class="btn-primary" onclick="saveTopicsOrder()">保存</button>
+                    </div>
+                </div>
+                <div class="settings-help">
+                    <p>拖拽调整主题在"主题聚合"页面的显示顺序。取消勾选可隐藏主题。</p>
+                </div>
+                <div id="topicsOrderList" class="platforms-list">加载中...</div>
+            </div>
+            <div id="settingsTopics" class="settings-panel">
                 <div class="settings-header">
                     <h3>主题关键词配置</h3>
                     <div class="settings-actions">
@@ -884,18 +948,18 @@ async function renderSettingsView(container) {
                 </div>
                 <textarea id="frequencyWordsEditor" class="settings-editor" placeholder="加载中..."></textarea>
             </div>
-            <div id="settingsPlatforms" class="settings-panel">
+            <div id="settingsTabs" class="settings-panel">
                 <div class="settings-header">
-                    <h3>来源管理</h3>
+                    <h3>模块排序</h3>
                     <div class="settings-actions">
-                        <button class="btn-secondary" onclick="loadPlatforms()">刷新</button>
-                        <button class="btn-primary" onclick="savePlatforms()">保存</button>
+                        <button class="btn-secondary" onclick="loadTabs()">刷新</button>
+                        <button class="btn-primary" onclick="saveTabs()">保存</button>
                     </div>
                 </div>
                 <div class="settings-help">
-                    <p>勾选启用的新闻来源，取消勾选可临时禁用。拖拽可调整顺序。</p>
+                    <p>拖拽调整顶部导航模块的显示顺序。取消勾选可隐藏模块。</p>
                 </div>
-                <div id="platformsList" class="platforms-list">加载中...</div>
+                <div id="tabsList" class="platforms-list">加载中...</div>
             </div>
         </div>
     </div>`;
@@ -913,6 +977,8 @@ async function renderSettingsView(container) {
     // 加载数据
     loadFrequencyWords();
     loadPlatforms();
+    loadTabs();
+    loadTopicsOrder();
 }
 
 async function loadFrequencyWords() {
@@ -940,8 +1006,8 @@ async function saveFrequencyWords() {
         });
         const data = await res.json();
         if (data.success) {
-            alert('保存成功！主题配置已更新。');
             settingsData.frequencyWords = content;
+            showToast('设置完成');
         } else {
             alert('保存失败: ' + data.error);
         }
@@ -969,15 +1035,15 @@ function renderPlatformsList(platforms) {
     const container = document.getElementById('platformsList');
     if (!container) return;
     container.innerHTML = platforms.map((p, i) => `
-        <div class="platform-item" draggable="true" data-index="${i}">
-            <span class="platform-drag">☰</span>
-            <label class="platform-checkbox">
-                <input type="checkbox" checked data-id="${p.id}">
-                <span class="platform-name">${p.name}</span>
-                <span class="platform-id">${p.id}</span>
-            </label>
-        </div>
-    `).join('');
+            <div class="platform-item" draggable="true" data-index="${i}">
+                <span class="platform-drag">☰</span>
+                <label class="platform-checkbox">
+                    <input type="checkbox" ${p.enabled !== false ? 'checked' : ''} data-id="${p.id}">
+                    <span class="platform-name">${p.name}</span>
+                    <span class="platform-id">${p.id}</span>
+                </label>
+            </div>
+        `).join('');
     
     // 拖拽排序
     let draggedItem = null;
@@ -997,11 +1063,13 @@ async function savePlatforms() {
     const platforms = [];
     container.querySelectorAll('.platform-item').forEach(item => {
         const checkbox = item.querySelector('input[type="checkbox"]');
-        if (checkbox.checked) {
-            const id = checkbox.dataset.id;
-            const name = item.querySelector('.platform-name').textContent;
-            platforms.push({ id, name });
-        }
+        const id = checkbox.dataset.id;
+        const name = item.querySelector('.platform-name').textContent;
+        platforms.push({ 
+            id, 
+            name,
+            enabled: checkbox.checked 
+        });
     });
     
     try {
@@ -1012,8 +1080,8 @@ async function savePlatforms() {
         });
         const data = await res.json();
         if (data.success) {
-            alert('保存成功！来源配置已更新。下次爬取将使用新配置。');
             settingsData.platforms = platforms;
+            showToast('设置完成');
         } else {
             alert('保存失败: ' + data.error);
         }
@@ -1022,7 +1090,225 @@ async function savePlatforms() {
     }
 }
 
-function switchToTopic(idx) { currentView = 'topics'; currentFilter = topicsMeta[idx]?.category || 'all'; renderView(); updateMainTabs(); }
+// 模块排序相关函数
+async function loadTabs() {
+    try {
+        const res = await fetch('/api/config/tabs');
+        const data = await res.json();
+        if (data.success) {
+            // 合并保存的配置和默认配置
+            let tabs = data.tabs || [];
+            if (tabs.length === 0) {
+                tabs = JSON.parse(JSON.stringify(defaultTabs));
+            } else {
+                // 确保所有默认模块都存在
+                const savedIds = tabs.map(t => t.id);
+                defaultTabs.forEach(dt => {
+                    if (!savedIds.includes(dt.id)) {
+                        tabs.push({ ...dt });
+                    }
+                });
+            }
+            settingsData.tabs = tabs;
+            renderTabsList(tabs);
+            applyTabsOrder(tabs);
+        }
+    } catch (e) {
+        console.error('加载模块配置失败:', e);
+        renderTabsList(defaultTabs);
+    }
+}
+
+function renderTabsList(tabs) {
+    const container = document.getElementById('tabsList');
+    container.innerHTML = tabs.map(tab => `
+        <div class="platform-item" draggable="true" data-id="${tab.id}">
+            <span class="drag-handle">☰</span>
+            <label class="platform-label">
+                <input type="checkbox" data-id="${tab.id}" ${tab.enabled !== false ? 'checked' : ''}>
+                <span class="platform-name">${tab.name}</span>
+            </label>
+        </div>
+    `).join('');
+    
+    // 绑定拖拽事件
+    let draggedItem = null;
+    container.querySelectorAll('.platform-item').forEach(item => {
+        item.addEventListener('dragstart', e => { draggedItem = item; item.classList.add('dragging'); });
+        item.addEventListener('dragend', () => { draggedItem.classList.remove('dragging'); draggedItem = null; });
+        item.addEventListener('dragover', e => { e.preventDefault(); if (draggedItem && draggedItem !== item) {
+            const rect = item.getBoundingClientRect();
+            const next = e.clientY - rect.top > rect.height / 2;
+            container.insertBefore(draggedItem, next ? item.nextSibling : item);
+        }});
+    });
+}
+
+async function saveTabs() {
+    const container = document.getElementById('tabsList');
+    const tabs = [];
+    container.querySelectorAll('.platform-item').forEach(item => {
+        const checkbox = item.querySelector('input[type="checkbox"]');
+        const id = checkbox.dataset.id;
+        const name = item.querySelector('.platform-name').textContent;
+        tabs.push({ id, name, enabled: checkbox.checked });
+    });
+    
+    try {
+        const res = await fetch('/api/config/tabs', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ tabs })
+        });
+        const data = await res.json();
+        if (data.success) {
+            settingsData.tabs = tabs;
+            applyTabsOrder(tabs);
+            showToast('设置完成');
+        } else {
+            alert('保存失败: ' + data.error);
+        }
+    } catch (e) {
+        alert('保存失败: ' + e.message);
+    }
+}
+
+function applyTabsOrder(tabs) {
+    const nav = document.querySelector('.main-tabs');
+    if (!nav) return;
+    
+    tabs.forEach(tab => {
+        const btn = nav.querySelector(`[data-view="${tab.id}"]`);
+        if (btn) {
+            btn.style.display = tab.enabled !== false ? '' : 'none';
+            nav.appendChild(btn); // 移动到末尾，按顺序排列
+        }
+    });
+}
+
+// 主题排序相关函数
+let topicsOrderData = [];
+
+async function loadTopicsOrder() {
+    try {
+        // 先获取当前所有主题
+        const topicsRes = await fetch('/api/topics');
+        const topicsData = await topicsRes.json();
+        const allTopics = topicsData.topics || [];
+        
+        // 获取保存的顺序配置
+        const orderRes = await fetch('/api/config/topics_order');
+        const orderData = await orderRes.json();
+        const savedOrder = orderData.topics_order || [];
+        
+        // 合并：按保存顺序排列，新主题追加到末尾
+        let orderedTopics = [];
+        const savedIds = savedOrder.map(t => t.id);
+        const allIds = allTopics.map(t => t.id);
+        
+        // 先添加保存顺序中存在的主题
+        savedOrder.forEach(saved => {
+            const topic = allTopics.find(t => t.id === saved.id);
+            if (topic) {
+                orderedTopics.push({
+                    id: topic.id,
+                    name: topic.name,
+                    category: topic.category || '未分类',
+                    enabled: saved.enabled !== false
+                });
+            }
+        });
+        
+        // 添加新主题（不在保存顺序中的）
+        allTopics.forEach(topic => {
+            if (!savedIds.includes(topic.id)) {
+                orderedTopics.push({
+                    id: topic.id,
+                    name: topic.name,
+                    category: topic.category || '未分类',
+                    enabled: true
+                });
+            }
+        });
+        
+        topicsOrderData = orderedTopics;
+        renderTopicsOrderList(orderedTopics);
+    } catch (e) {
+        console.error('加载主题顺序失败:', e);
+        document.getElementById('topicsOrderList').innerHTML = '加载失败: ' + e.message;
+    }
+}
+
+function renderTopicsOrderList(topics) {
+    const container = document.getElementById('topicsOrderList');
+    container.innerHTML = topics.map(topic => `
+        <div class="platform-item" draggable="true" data-id="${topic.id}">
+            <span class="drag-handle">☰</span>
+            <label class="platform-label">
+                <input type="checkbox" data-id="${topic.id}" ${topic.enabled !== false ? 'checked' : ''}>
+                <span class="platform-name">${topic.name}</span>
+                <span class="platform-category" style="color:#888;font-size:12px;margin-left:8px;">${topic.category}</span>
+            </label>
+        </div>
+    `).join('');
+    
+    // 绑定拖拽事件
+    let draggedItem = null;
+    container.querySelectorAll('.platform-item').forEach(item => {
+        item.addEventListener('dragstart', e => { draggedItem = item; item.classList.add('dragging'); });
+        item.addEventListener('dragend', () => { draggedItem.classList.remove('dragging'); draggedItem = null; });
+        item.addEventListener('dragover', e => { e.preventDefault(); if (draggedItem && draggedItem !== item) {
+            const rect = item.getBoundingClientRect();
+            const next = e.clientY - rect.top > rect.height / 2;
+            container.insertBefore(draggedItem, next ? item.nextSibling : item);
+        }});
+    });
+}
+
+async function saveTopicsOrder() {
+    const container = document.getElementById('topicsOrderList');
+    const topics_order = [];
+    container.querySelectorAll('.platform-item').forEach(item => {
+        const checkbox = item.querySelector('input[type="checkbox"]');
+        const id = checkbox.dataset.id;
+        const name = item.querySelector('.platform-name').textContent;
+        topics_order.push({ id, name, enabled: checkbox.checked });
+    });
+    
+    try {
+        const res = await fetch('/api/config/topics_order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ topics_order })
+        });
+        const data = await res.json();
+        if (data.success) {
+            topicsOrderData = topics_order;
+            showToast('设置完成');
+        } else {
+            alert('保存失败: ' + data.error);
+        }
+    } catch (e) {
+        alert('保存失败: ' + e.message);
+    }
+}
+
+function showToast(message, duration = 1000) {
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    setTimeout(() => toast.remove(), duration);
+}
+
+function switchToTopic(idx) { 
+    const topic = topicsData[idx];
+    currentView = 'topics'; 
+    currentFilter = topic?.category || 'all'; 
+    renderView(); 
+    updateMainTabs(); 
+    saveStateToHash();
+}
 function updateMainTabs() { document.querySelectorAll('.main-tab').forEach(t => t.classList.toggle('active', t.dataset.view === currentView)); }
 function refreshData() { const btn = document.getElementById('refreshBtn'); btn.classList.add('loading'); allNewsData.loaded = false; loadData().finally(() => btn.classList.remove('loading')); }
 function setupAutoRefresh() { const interval = parseInt(document.getElementById('autoRefresh').value) * 1000; if (autoRefreshTimer) clearInterval(autoRefreshTimer); if (interval > 0) autoRefreshTimer = setInterval(refreshData, interval); }
@@ -1031,8 +1317,7 @@ async function triggerCrawl() {
     const btn = document.getElementById('crawlBtn');
     if (btn.classList.contains('loading')) return;
     btn.classList.add('loading');
-    const originalText = btn.textContent;
-    btn.innerHTML = '🕷️ 爬取中';
+    btn.textContent = '🕷️ 爬取中';
     try {
         const res = await fetch('/api/crawl');
         const data = await res.json();
@@ -1043,14 +1328,14 @@ async function triggerCrawl() {
                 if (!status.running) {
                     clearInterval(checkStatus);
                     btn.classList.remove('loading');
-                    btn.innerHTML = originalText;
-                    alert(status.message || '爬取完成');
+                    btn.textContent = '🕷️ 爬取';
+                    showToast('爬取完成');
                     refreshData();
                 }
             }, 3000);
         } else {
             btn.classList.remove('loading');
-            btn.innerHTML = originalText;
+            btn.textContent = '🕷️ 爬取';
             alert(data.message || '启动失败');
         }
     } catch (e) {
@@ -1066,8 +1351,11 @@ document.getElementById('refreshBtn').addEventListener('click', refreshData);
 document.getElementById('crawlBtn').addEventListener('click', triggerCrawl);
 document.getElementById('autoRefresh').addEventListener('change', setupAutoRefresh);
 window.addEventListener('hashchange', () => { loadStateFromHash(); renderView(); updateMainTabs(); });
+window.addEventListener('resize', () => setTimeout(adjustSingleRowLayout, 100));
 
 loadStateFromHash(); updateMainTabs(); loadData().then(() => { loadStateFromHash(); renderView(); updateMainTabs(); }); setupAutoRefresh();
+// 页面加载时应用模块顺序
+fetch('/api/config/tabs').then(r => r.json()).then(data => { if (data.success && data.tabs) applyTabsOrder(data.tabs); }).catch(() => {});
 </script>
 </body>
 </html>

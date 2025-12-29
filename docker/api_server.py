@@ -33,6 +33,7 @@ import threading
 import time
 import yaml
 from datetime import datetime
+
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlparse
@@ -54,6 +55,7 @@ STATIC_DIR = Path(__file__).parent  # docker 目录，存放 app.html 模板
 CONFIG_DIR = Path("/app/config") if Path("/app/config").exists() else Path(__file__).parent.parent / "config"
 FREQUENCY_WORDS_FILE = CONFIG_DIR / "frequency_words.txt"
 CONFIG_YAML_FILE = CONFIG_DIR / "config.yaml"
+USER_SETTINGS_FILE = CONFIG_DIR / "user_settings.json"
 
 # 全局缓存
 cache = {
@@ -96,13 +98,187 @@ def load_frequency_config():
             frequency_cache["filter_words"] = filter_words
             frequency_cache["global_filters"] = global_filters
             frequency_cache["last_modified"] = current_mtime
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] Loaded {len(word_groups)} word groups from frequency_words.txt")
-        return frequency_cache["word_groups"], frequency_cache["filter_words"], frequency_cache["global_filters"]
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Loaded {len(word_groups)} word groups from frequency_words.txt")
     except Exception as e:
         print(f"[{datetime.now().strftime('%H:%M:%S')}] Error loading frequency words: {e}")
         import traceback
         traceback.print_exc()
         return [], [], []
+    
+    return frequency_cache["word_groups"], frequency_cache["filter_words"], frequency_cache["global_filters"]
+
+
+def get_user_settings():
+    """获取用户自定义设置"""
+    try:
+        if USER_SETTINGS_FILE.exists():
+            return json.loads(USER_SETTINGS_FILE.read_text(encoding='utf-8'))
+    except Exception as e:
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Error loading user settings: {e}")
+    return {}
+
+
+def save_user_settings(settings):
+    """保存用户自定义设置"""
+    try:
+        current_settings = get_user_settings()
+        current_settings.update(settings)
+        USER_SETTINGS_FILE.write_text(json.dumps(current_settings, ensure_ascii=False, indent=2), encoding='utf-8')
+        return True
+    except Exception as e:
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Error saving user settings: {e}")
+        return False
+
+
+def normalize_platforms_for_save(posted_platforms):
+    posted_platforms = posted_platforms or []
+
+    existing_platforms = (get_user_settings() or {}).get('platforms', []) or []
+    existing_by_id = {p.get('id'): p for p in existing_platforms if isinstance(p, dict) and p.get('id')}
+
+    config = {}
+    try:
+        if CONFIG_YAML_FILE.exists():
+            with open(CONFIG_YAML_FILE, 'r', encoding='utf-8') as f:
+                config = yaml.safe_load(f) or {}
+    except Exception:
+        config = {}
+
+    config_platforms = config.get('platforms', []) or []
+    config_by_id = {p.get('id'): p for p in config_platforms if isinstance(p, dict) and p.get('id')}
+
+    normalized = []
+    seen = set()
+
+    for p in posted_platforms:
+        if not isinstance(p, dict):
+            continue
+        pid = p.get('id')
+        if not pid or pid in seen:
+            continue
+        base = existing_by_id.get(pid, {}) or {}
+        enabled = p.get('enabled', base.get('enabled', True))
+        name = (config_by_id.get(pid, {}) or {}).get('name') or p.get('name') or base.get('name') or pid
+        normalized.append({"id": pid, "name": name, "enabled": bool(enabled)})
+        seen.add(pid)
+
+    for pid, cp in config_by_id.items():
+        if pid in seen:
+            continue
+        base = existing_by_id.get(pid, {}) or {}
+        enabled = base.get('enabled', True)
+        name = cp.get('name') or base.get('name') or pid
+        normalized.append({"id": pid, "name": name, "enabled": bool(enabled)})
+        seen.add(pid)
+
+    for pid, ep in existing_by_id.items():
+        if pid in seen:
+            continue
+        normalized.append({
+            "id": pid,
+            "name": ep.get('name', pid),
+            "enabled": bool(ep.get('enabled', True))
+        })
+        seen.add(pid)
+
+    return normalized
+
+
+def get_combined_config():
+    """获取合并后的配置（config.yaml + user_settings.json）"""
+    config = {}
+    try:
+        if CONFIG_YAML_FILE.exists():
+            with open(CONFIG_YAML_FILE, 'r', encoding='utf-8') as f:
+                config = yaml.safe_load(f) or {}
+    except Exception as e:
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Error loading config.yaml: {e}")
+    
+    user_settings = get_user_settings()
+    
+    # 合并配置 - 仅覆盖特定字段
+    if 'platforms' in user_settings:
+        # 智能合并 platforms: 使用 user_settings 的顺序和状态，但保留 config 中存在但 user_settings 中缺失的项
+        user_platforms = user_settings['platforms']
+        user_ids = [p['id'] for p in user_platforms]
+        config_platforms = config.get('platforms', [])
+        
+        merged_platforms = []
+        # 1. 添加用户配置的平台（保持用户顺序）
+        for up in user_platforms:
+            # 查找原始配置以获取完整信息（如果需要），这里主要保留 enabled 状态
+            # 如果 user_settings 中有，说明用户已保存过，直接使用
+            if 'enabled' not in up:
+                 up['enabled'] = True
+            merged_platforms.append(up)
+            
+        # 2. 添加 config 中有但 user_settings 中没有的平台（追加到末尾，默认启用）
+        for cp in config_platforms:
+            if cp['id'] not in user_ids:
+                # 确保有 enabled 字段，默认为 True
+                if 'enabled' not in cp:
+                    cp['enabled'] = True
+                merged_platforms.append(cp)
+                
+        # 去重并统一名称（以 config.yaml 为准）
+        config_platforms_map = {cp['id']: cp.get('name', cp['id']) for cp in config_platforms}
+        seen_ids = set()
+        unified_platforms = []
+        for p in merged_platforms:
+            pid = p.get('id')
+            if not pid or pid in seen_ids:
+                continue
+            p['name'] = config_platforms_map.get(pid, p.get('name', pid))
+            unified_platforms.append(p)
+            seen_ids.add(pid)
+        # 二次补齐：确保所有 config.yaml 中的平台都在最终列表
+        for cp in config_platforms:
+            if cp['id'] not in seen_ids:
+                unified_platforms.append({
+                    "id": cp['id'],
+                    "name": cp.get('name', cp['id']),
+                    "enabled": True
+                })
+                seen_ids.add(cp['id'])
+        config['platforms'] = unified_platforms
+        # 自愈修复：如果 user_settings 中缺少平台项，则同步修复写回
+        try:
+            if len(user_platforms) != len(unified_platforms):
+                current_settings = get_user_settings()
+                current_settings['platforms'] = unified_platforms
+                USER_SETTINGS_FILE.write_text(json.dumps(current_settings, ensure_ascii=False, indent=2), encoding='utf-8')
+        except Exception:
+            pass
+    else:
+        config_platforms = config.get('platforms', []) or []
+        seeded_platforms = []
+        for cp in config_platforms:
+            if not isinstance(cp, dict):
+                continue
+            pid = cp.get('id')
+            if not pid:
+                continue
+            seeded_platforms.append({
+                "id": pid,
+                "name": cp.get('name', pid),
+                "enabled": bool(cp.get('enabled', True))
+            })
+        if seeded_platforms:
+            config['platforms'] = seeded_platforms
+            try:
+                current_settings = get_user_settings()
+                if not current_settings.get('platforms'):
+                    current_settings['platforms'] = seeded_platforms
+                    USER_SETTINGS_FILE.write_text(json.dumps(current_settings, ensure_ascii=False, indent=2), encoding='utf-8')
+            except Exception:
+                pass
+
+    if 'ui_tabs' in user_settings:
+        config['ui_tabs'] = user_settings['ui_tabs']
+    if 'topics_order' in user_settings:
+        config['topics_order'] = user_settings['topics_order']
+        
+    return config
 
 
 def find_matched_topics(title: str, word_groups: list, filter_words: list, global_filters: list) -> list:
@@ -267,10 +443,25 @@ def parse_index_html():
                 "isNew": news.get("isNew", False)
             })
     
+    # 读取平台配置顺序
+    platform_order = {}
+    config = get_combined_config()
+    platforms_config = config.get('platforms', [])
+    for i, p in enumerate(platforms_config):
+        platform_order[p['name']] = i
+    enabled_by_name = {p['name']: p.get('enabled', True) for p in platforms_config}
+    
+    # 按配置顺序排序（未配置的排在最后，按新闻数量降序）
     sources_list = [
-        {"name": name, "count": len(news), "news": news}
-        for name, news in sorted(sources.items(), key=lambda x: -len(x[1]))
+        {"name": name, "count": len(news), "news": news, "order": platform_order.get(name, 999)}
+        for name, news in sources.items()
     ]
+    # 过滤掉被禁用的平台
+    sources_list = [s for s in sources_list if enabled_by_name.get(s['name'], True)]
+    sources_list.sort(key=lambda x: (x['order'], -x['count']))
+    # 移除 order 字段
+    for s in sources_list:
+        del s['order']
     
     return update_time, topics, sources_list
 
@@ -283,6 +474,8 @@ def refresh_cache():
     try:
         update_time, topics, sources = parse_index_html()
         if topics is not None:
+            # 应用主题顺序配置
+            topics = apply_topics_order(topics)
             with cache_lock:
                 cache["update_time"] = update_time
                 cache["topics"] = topics
@@ -294,6 +487,45 @@ def refresh_cache():
     except Exception as e:
         print(f"[{datetime.now().strftime('%H:%M:%S')}] Cache refresh error: {e}")
     return False
+
+
+def apply_topics_order(topics):
+    """应用保存的主题顺序配置"""
+    try:
+        config = get_combined_config()
+        topics_order = config.get('topics_order', None)
+        if topics_order:
+            # 使用名称匹配（更可靠，避免 id 类型不匹配问题）
+            topics_map = {t['name']: t for t in topics}
+            ordered_topics = []
+            saved_names = []
+            
+            # 按保存顺序添加启用的主题
+            for saved in topics_order:
+                topic_name = saved.get('name')
+                if topic_name in topics_map:
+                    # 无论是否启用，都从 topics_map 中获取最新数据，并保留 saved 中的 enabled 状态
+                    topic_data = topics_map[topic_name]
+                    # 如果 saved 中有 enabled 字段，则使用它，否则默认为 True
+                    # 注意：前端可能需要 enabled 字段来决定是否渲染，但后端应该始终返回所有主题，或者根据参数决定
+                    # 这里我们遵循原逻辑：后端返回列表供前端渲染，前端根据 enabled 字段决定是否显示内容或仅显示开关
+                    # 但是，如果这里过滤掉了 enabled=False 的主题，前端就彻底拿不到数据了，导致无法重新开启
+                    
+                    # 修正：始终返回所有在 topics_order 中的主题，并附带 enabled 状态
+                    topic_data['enabled'] = saved.get('enabled', True)
+                    ordered_topics.append(topic_data)
+                    saved_names.append(topic_name)
+            
+            # 添加新主题（不在保存顺序中的），默认启用
+            for topic in topics:
+                if topic['name'] not in saved_names:
+                    topic['enabled'] = True
+                    ordered_topics.append(topic)
+            
+            return ordered_topics
+    except Exception as e:
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] apply_topics_order error: {e}")
+    return topics
 
 
 def watch_file():
@@ -331,6 +563,12 @@ class APIHandler(SimpleHTTPRequestHandler):
     
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=str(OUTPUT_DIR), **kwargs)
+
+    def end_headers(self):
+        self.send_header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0')
+        self.send_header('Pragma', 'no-cache')
+        self.send_header('Expires', '0')
+        super().end_headers()
     
     def trigger_crawl(self):
         """触发爬虫任务"""
@@ -386,12 +624,12 @@ class APIHandler(SimpleHTTPRequestHandler):
         try:
             # 读取平台配置顺序
             platform_order = {}
-            if CONFIG_YAML_FILE.exists():
-                with open(CONFIG_YAML_FILE, 'r', encoding='utf-8') as f:
-                    config = yaml.safe_load(f)
-                platforms_config = config.get('platforms', [])
-                for i, p in enumerate(platforms_config):
-                    platform_order[p['id']] = {'order': i, 'name': p['name']}
+            config = get_combined_config()
+            platforms_config = config.get('platforms', [])
+            for i, p in enumerate(platforms_config):
+                platform_order[p['id']] = {'order': i, 'name': p['name']}
+            platform_enabled_id = {p['id']: p.get('enabled', True) for p in platforms_config}
+            platform_enabled_name = {p['name']: p.get('enabled', True) for p in platforms_config}
             
             conn = sqlite3.connect(str(db_path))
             conn.row_factory = sqlite3.Row
@@ -433,8 +671,11 @@ class APIHandler(SimpleHTTPRequestHandler):
                     'rank': row['rank']
                 })
             
-            # 按配置顺序排序
-            sources_list = sorted(sources_dict.values(), key=lambda x: x['order'])
+            # 按配置顺序排序并过滤禁用平台
+            sources_list = [
+                s for s in sorted(sources_dict.values(), key=lambda x: x['order'])
+                if platform_enabled_id.get(s['id'], platform_enabled_name.get(s['name'], True))
+            ]
             
             # 添加 count 并移除 order 字段
             for s in sources_list:
@@ -473,11 +714,9 @@ class APIHandler(SimpleHTTPRequestHandler):
         try:
             # 读取平台配置
             platform_names = {}
-            if CONFIG_YAML_FILE.exists():
-                with open(CONFIG_YAML_FILE, 'r', encoding='utf-8') as f:
-                    config = yaml.safe_load(f)
-                for p in config.get('platforms', []):
-                    platform_names[p['id']] = p['name']
+            config = get_combined_config()
+            for p in config.get('platforms', []):
+                platform_names[p['id']] = p['name']
             
             conn = sqlite3.connect(str(db_path))
             conn.row_factory = sqlite3.Row
@@ -522,7 +761,6 @@ class APIHandler(SimpleHTTPRequestHandler):
         self.send_response(status)
         self.send_header('Content-Type', 'application/json; charset=utf-8')
         self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Cache-Control', 'no-cache')
         self.end_headers()
         self.wfile.write(json.dumps(data, ensure_ascii=False).encode('utf-8'))
     
@@ -578,13 +816,36 @@ class APIHandler(SimpleHTTPRequestHandler):
         elif path == '/api/config/platforms':
             # 获取平台配置
             try:
-                if CONFIG_YAML_FILE.exists():
-                    with open(CONFIG_YAML_FILE, 'r', encoding='utf-8') as f:
-                        config = yaml.safe_load(f)
+                config = get_combined_config()
+                if config:
                     platforms = config.get('platforms', [])
                     self.send_json({"success": True, "platforms": platforms})
                 else:
                     self.send_json({"success": False, "error": "配置文件不存在"}, 404)
+            except Exception as e:
+                self.send_json({"success": False, "error": str(e)}, 500)
+        
+        elif path == '/api/config/tabs':
+            # 获取模块顺序配置
+            try:
+                config = get_combined_config()
+                if config:
+                    tabs = config.get('ui_tabs', None)
+                    self.send_json({"success": True, "tabs": tabs})
+                else:
+                    self.send_json({"success": True, "tabs": None})
+            except Exception as e:
+                self.send_json({"success": False, "error": str(e)}, 500)
+        
+        elif path == '/api/config/topics_order':
+            # 获取主题顺序配置
+            try:
+                config = get_combined_config()
+                if config:
+                    topics_order = config.get('topics_order', None)
+                    self.send_json({"success": True, "topics_order": topics_order})
+                else:
+                    self.send_json({"success": True, "topics_order": None})
             except Exception as e:
                 self.send_json({"success": False, "error": str(e)}, 500)
         
@@ -635,24 +896,44 @@ class APIHandler(SimpleHTTPRequestHandler):
             # 保存平台配置
             try:
                 data = json.loads(post_data)
-                platforms = data.get('platforms', [])
+                platforms = normalize_platforms_for_save(data.get('platforms', []))
                 
-                if CONFIG_YAML_FILE.exists():
-                    # 读取现有配置
-                    with open(CONFIG_YAML_FILE, 'r', encoding='utf-8') as f:
-                        config = yaml.safe_load(f) or {}
-                    # 备份
-                    backup_file = CONFIG_YAML_FILE.with_suffix('.yaml.bak')
-                    with open(backup_file, 'w', encoding='utf-8') as f:
-                        yaml.dump(config, f, allow_unicode=True, default_flow_style=False)
-                    # 更新 platforms
-                    config['platforms'] = platforms
-                    # 写入
-                    with open(CONFIG_YAML_FILE, 'w', encoding='utf-8') as f:
-                        yaml.dump(config, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+                if save_user_settings({'platforms': platforms}):
+                    # 刷新缓存以应用新的来源顺序
+                    # 注意：前端可能只发回了选中的平台（取决于前端逻辑）
+                    # 但我们的 get_combined_config 会把缺失的补回来，所以这里保存是安全的
+                    refresh_cache()
                     self.send_json({"success": True, "message": "保存成功"})
                 else:
-                    self.send_json({"success": False, "error": "配置文件不存在"}, 404)
+                    self.send_json({"success": False, "error": "保存失败"}, 500)
+            except Exception as e:
+                self.send_json({"success": False, "error": str(e)}, 500)
+        
+        elif path == '/api/config/tabs':
+            # 保存模块顺序配置
+            try:
+                data = json.loads(post_data)
+                tabs = data.get('tabs', [])
+                
+                if save_user_settings({'ui_tabs': tabs}):
+                    self.send_json({"success": True, "message": "保存成功"})
+                else:
+                    self.send_json({"success": False, "error": "保存失败"}, 500)
+            except Exception as e:
+                self.send_json({"success": False, "error": str(e)}, 500)
+        
+        elif path == '/api/config/topics_order':
+            # 保存主题顺序配置
+            try:
+                data = json.loads(post_data)
+                topics_order = data.get('topics_order', [])
+                
+                if save_user_settings({'topics_order': topics_order}):
+                    # 刷新缓存以应用新的主题顺序
+                    refresh_cache()
+                    self.send_json({"success": True, "message": "保存成功"})
+                else:
+                    self.send_json({"success": False, "error": "保存失败"}, 500)
             except Exception as e:
                 self.send_json({"success": False, "error": str(e)}, 500)
         

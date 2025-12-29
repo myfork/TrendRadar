@@ -1,0 +1,388 @@
+{
+  "topics_order": [
+    {
+      "id": "3",
+      "name": "金融财经",
+      "enabled": true
+    },
+    {
+      "id": "1",
+      "name": "AR/VR",
+      "enabled": true
+    },
+    {
+      "id": "0",
+      "name": "AI大模型",
+      "enabled": true
+    },
+    {
+      "id": "4",
+      "name": "国内科技公司",
+      "enabled": true
+    },
+    {
+      "id": "5",
+      "name": "国外科技公司",
+      "enabled": true
+    },
+    {
+      "id": "6",
+      "name": "航天航空",
+      "enabled": true
+    },
+    {
+      "id": "7",
+      "name": "芯片半导体",
+      "enabled": true
+    },
+    {
+      "id": "11",
+      "name": "新能源汽车",
+      "enabled": true
+    },
+    {
+      "id": "9",
+      "name": "机器人",
+      "enabled": true
+    },
+    {
+      "id": "12",
+      "name": "大疆无人机",
+      "enabled": true
+    },
+    {
+      "id": "14",
+      "name": "自动驾驶",
+      "enabled": true
+    },
+    {
+      "id": "10",
+      "name": "游戏",
+      "enabled": true
+    },
+    {
+      "id": "15",
+      "name": "书籍",
+      "enabled": true
+    },
+    {
+      "id": "13",
+      "name": "中国政治",
+      "enabled": true
+    },
+    {
+      "id": "2",
+      "name": "美国政治",
+      "enabled": true
+    },
+    {
+      "id": "8",
+      "name": "世界政治",
+      "enabled": true
+    }
+  ],
+  "ui_tabs": [
+    {
+      "id": "topics",
+      "name": "主题聚合",
+      "enabled": true
+    },
+    {
+      "id": "newonly",
+      "name": "增量新闻",
+      "enabled": true
+    },
+    {
+      "id": "sources",
+      "name": "来源聚合",
+      "enabled": true
+    },
+    {
+      "id": "report",
+      "name": "原始报告",
+      "enabled": true
+    },
+    {
+      "id": "nav",
+      "name": "主题导航",
+      "enabled": true
+    },
+    {
+      "id": "filter",
+      "name": "筛选",
+      "enabled": true
+    },
+    {
+      "id": "search",
+      "name": "搜索",
+      "enabled": true
+    },
+    {
+      "id": "allnews",
+      "name": "全部新闻",
+      "enabled": true
+    },
+    {
+      "id": "settings",
+      "name": "设置",
+      "enabled": true
+    }
+  ],
+  "platforms": [
+    {
+      "id": "toutiao",
+      "name": "今日头条",
+      "enabled": true
+    },
+    {
+      "id": "ifeng",
+      "name": "凤凰网",
+      "enabled": true
+    },
+    {
+      "id": "baidu",
+      "name": "百度热搜",
+      "enabled": true
+    },
+    {
+      "id": "thepaper",
+      "name": "澎湃新闻",
+      "enabled": true
+    },
+    {
+      "id": "cankaoxiaoxi",
+      "name": "参考消息",
+      "enabled": true
+    },
+    {
+      "id": "sputniknewscn",
+      "name": "卫星通讯社",
+      "enabled": true
+    },
+    {
+      "id": "zaobao",
+      "name": "联合早报",
+      "enabled": true
+    },
+    {
+      "id": "mktnews",
+      "name": "MKT新闻",
+      "enabled": true
+    },
+    {
+      "id": "kaopu",
+      "name": "靠谱新闻",
+      "enabled": true
+    },
+    {
+      "id": "tencent-hot",
+      "name": "腾讯新闻",
+      "enabled": true
+    },
+    {
+      "id": "wallstreetcn-hot",
+      "name": "华尔街见闻 最热",
+      "enabled": true
+    },
+    {
+      "id": "wallstreetcn-quick",
+      "name": "华尔街见闻 快讯",
+      "enabled": true
+    },
+    {
+      "id": "wallstreetcn-news",
+      "name": "华尔街见闻 最新",
+      "enabled": true
+    },
+    {
+      "id": "cls-hot",
+      "name": "财联社热门",
+      "enabled": true
+    },
+    {
+      "id": "cls-telegraph",
+      "name": "财联社 电报",
+      "enabled": true
+    },
+    {
+      "id": "cls-depth",
+      "name": "财联社 深度",
+      "enabled": true
+    },
+    {
+      "id": "gelonghui",
+      "name": "格隆汇",
+      "enabled": true
+    },
+    {
+      "id": "xueqiu",
+      "name": "雪球",
+      "enabled": true
+    },
+    {
+      "id": "jin10",
+      "name": "金十数据",
+      "enabled": true
+    },
+    {
+      "id": "fastbull",
+      "name": "快讯通",
+      "enabled": true
+    },
+    {
+      "id": "fastbull-express",
+      "name": "法布财经 快讯",
+      "enabled": true
+    },
+    {
+      "id": "fastbull-news",
+      "name": "法布财经 头条",
+      "enabled": true
+    },
+    {
+      "id": "weibo",
+      "name": "微博",
+      "enabled": true
+    },
+    {
+      "id": "douyin",
+      "name": "抖音",
+      "enabled": true
+    },
+    {
+      "id": "kuaishou",
+      "name": "快手",
+      "enabled": true
+    },
+    {
+      "id": "tieba",
+      "name": "贴吧",
+      "enabled": true
+    },
+    {
+      "id": "zhihu",
+      "name": "知乎",
+      "enabled": true
+    },
+    {
+      "id": "hupu",
+      "name": "虎扑",
+      "enabled": true
+    },
+    {
+      "id": "bilibili-hot-search",
+      "name": "bilibili 热搜",
+      "enabled": true
+    },
+    {
+      "id": "bilibili-hot-video",
+      "name": "bilibili 热门视频",
+      "enabled": true
+    },
+    {
+      "id": "bilibili-ranking",
+      "name": "bilibili 排行榜",
+      "enabled": true
+    },
+    {
+      "id": "qqvideo-tv-hotsearch",
+      "name": "腾讯视频 热搜榜",
+      "enabled": true
+    },
+    {
+      "id": "iqiyi-hot-ranklist",
+      "name": "爱奇艺 热播榜",
+      "enabled": true
+    },
+    {
+      "id": "douban",
+      "name": "豆瓣",
+      "enabled": true
+    },
+    {
+      "id": "ithome",
+      "name": "IT之家",
+      "enabled": true
+    },
+    {
+      "id": "36kr-quick",
+      "name": "36氪 快讯",
+      "enabled": true
+    },
+    {
+      "id": "36kr-renqi",
+      "name": "36氪 人气榜",
+      "enabled": true
+    },
+    {
+      "id": "juejin",
+      "name": "掘金",
+      "enabled": true
+    },
+    {
+      "id": "github",
+      "name": "GitHub",
+      "enabled": true
+    },
+    {
+      "id": "hackernews",
+      "name": "Hacker News",
+      "enabled": true
+    },
+    {
+      "id": "solidot",
+      "name": "Solidot",
+      "enabled": true
+    },
+    {
+      "id": "v2ex",
+      "name": "V2EX",
+      "enabled": true
+    },
+    {
+      "id": "nowcoder",
+      "name": "牛客网",
+      "enabled": true
+    },
+    {
+      "id": "pcbeta",
+      "name": "远景论坛",
+      "enabled": true
+    },
+    {
+      "id": "sspai",
+      "name": "少数派",
+      "enabled": true
+    },
+    {
+      "id": "producthunt",
+      "name": "ProductHunt",
+      "enabled": true
+    },
+    {
+      "id": "coolapk",
+      "name": "酷安",
+      "enabled": true
+    },
+    {
+      "id": "freebuf",
+      "name": "Freebuf 网络安全",
+      "enabled": true
+    },
+    {
+      "id": "chongbuluo",
+      "name": "虫部落 最新",
+      "enabled": true
+    },
+    {
+      "id": "chongbuluo-hot",
+      "name": "虫部落 最热",
+      "enabled": true
+    },
+    {
+      "id": "steam",
+      "name": "Steam 在线人数",
+      "enabled": true
+    }
+  ]
+}
