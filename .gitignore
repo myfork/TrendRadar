@@ -16,7 +16,7 @@ package-lock.json
 .specstory/
 
 __pycache__/
-output/*/
+output/
 uv.lock
 .trae/
 .cursor/
