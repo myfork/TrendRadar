@@ -614,9 +614,9 @@ class APIHandler(SimpleHTTPRequestHandler):
         """从数据库获取全部新闻（不过滤关键词），按配置的来源顺序排列"""
         import sqlite3
         
-        # 获取今天的数据库路径
+        # 获取今天的数据库路径（新格式：output/news/{date}.db）
         today = datetime.now().strftime("%Y-%m-%d")
-        db_path = OUTPUT_DIR / today / "news.db"
+        db_path = OUTPUT_DIR / "news" / f"{today}.db"
         
         if not db_path.exists():
             return {"success": False, "error": "今日数据库不存在", "sources": []}
@@ -704,9 +704,9 @@ class APIHandler(SimpleHTTPRequestHandler):
         
         keyword = keyword.strip()
         
-        # 获取今天的数据库路径
+        # 获取今天的数据库路径（新格式：output/news/{date}.db）
         today = datetime.now().strftime("%Y-%m-%d")
-        db_path = OUTPUT_DIR / today / "news.db"
+        db_path = OUTPUT_DIR / "news" / f"{today}.db"
         
         if not db_path.exists():
             return {"success": False, "error": "今日数据库不存在", "results": []}
