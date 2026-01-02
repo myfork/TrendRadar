@@ -1081,7 +1081,7 @@ class APIHandler(SimpleHTTPRequestHandler):
         self.end_headers()
     
     def log_message(self, format, *args):
-        if '/api/' in args[0]:
+        if args and isinstance(args[0], str) and '/api/' in args[0]:
             print(f"[{datetime.now().strftime('%H:%M:%S')}] {args[0]}")
 
 
