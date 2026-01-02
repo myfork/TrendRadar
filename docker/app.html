@@ -23,6 +23,9 @@
         .sub-tab { padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; transition: all 0.2s; background: rgba(255,255,255,0.05); color: var(--text-secondary); border: none; }
         .sub-tab:hover { background: rgba(255,255,255,0.1); color: var(--text-primary); }
         .sub-tab.active { background: rgba(124,58,237,0.3); color: white; }
+        .sub-tab.level2 { background: rgba(255,255,255,0.03); font-size: 12px; padding: 5px 10px; }
+        .sub-tab.level2.active { background: rgba(59,130,246,0.3); }
+        .filter-separator { color: var(--text-secondary); margin: 0 8px; opacity: 0.5; font-size: 14px; align-self: center; }
         .main { padding: 20px; max-width: 1800px; margin: 0 auto; }
         .update-info { text-align: center; padding: 12px; color: var(--text-secondary); font-size: 12px; }
         .card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px; }
@@ -35,6 +38,12 @@
         .card-title { font-size: 14px; font-weight: 600; }
         .card-subtitle { font-size: 11px; color: var(--text-secondary); margin-top: 2px; max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .card-count { font-size: 11px; padding: 3px 8px; border-radius: 10px; background: rgba(255,255,255,0.1); }
+        .card-tabs { display: flex; gap: 6px; }
+        .card-tab { font-size: 10px; padding: 3px 8px; border-radius: 8px; background: rgba(255,255,255,0.08); cursor: pointer; transition: all 0.2s; }
+        .card-tab:hover { background: rgba(255,255,255,0.15); }
+        .card-tab.active { background: var(--accent); color: white; }
+        .rss-pub-time { color: var(--text-secondary); margin-left: 6px; font-size: 10px; }
+        .empty-hint { text-align: center; color: var(--text-secondary); padding: 20px; font-size: 12px; }
         .news-list { flex: 1; overflow-y: auto; padding: 0 12px 12px; }
         .news-list::-webkit-scrollbar { width: 5px; }
         .news-list::-webkit-scrollbar-track { background: transparent; }
@@ -106,6 +115,8 @@
         .platform-item { display: flex; align-items: center; gap: 10px; padding: 12px 16px; background: var(--bg-card); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; cursor: grab; transition: all 0.2s; }
         .platform-item:hover { border-color: rgba(255,255,255,0.2); }
         .platform-item.dragging { opacity: 0.5; border-color: var(--accent); }
+        .platform-item.rss-source { border-left: 3px solid #f97316; }
+        .platform-rss-tag { background: linear-gradient(135deg, #f97316, #ea580c); color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; margin-left: auto; }
         .platform-drag { color: var(--text-secondary); font-size: 14px; cursor: grab; }
         .platform-checkbox { display: flex; align-items: center; gap: 10px; flex: 1; cursor: pointer; }
         .platform-checkbox input { width: 18px; height: 18px; accent-color: var(--accent); cursor: pointer; }
@@ -316,19 +327,97 @@ const sourceMeta = {
 };
 let topicsData = [], sourcesData = [], currentView = 'topics', currentFilter = 'all', autoRefreshTimer = null;
 
+const FILTER_STATE_KEY = 'trendradar_filter_state';
+const SETTINGS_TAB_KEY = 'trendradar_settings_tab';
+const SETTINGS_TABS = ['platforms', 'topicsorder', 'topics', 'tabs'];
+
+function saveFilterState() {
+    const state = {
+        selectedTopics,
+        selectedSources,
+        filterMode,
+        expandedTopics,
+        filterPanelExpanded
+    };
+    try {
+        localStorage.setItem(FILTER_STATE_KEY, JSON.stringify(state));
+    } catch (e) {
+        console.warn('Failed to save filter state', e);
+    }
+}
+
+function loadFilterState() {
+    try {
+        const raw = localStorage.getItem(FILTER_STATE_KEY);
+        if (!raw) return;
+        const state = JSON.parse(raw);
+        if (Array.isArray(state.selectedTopics)) selectedTopics = state.selectedTopics;
+        if (Array.isArray(state.selectedSources)) selectedSources = state.selectedSources;
+        if (state.filterMode === 'or' || state.filterMode === 'and') filterMode = state.filterMode;
+        if (Array.isArray(state.expandedTopics)) expandedTopics = state.expandedTopics;
+        if (typeof state.filterPanelExpanded === 'boolean') filterPanelExpanded = state.filterPanelExpanded;
+    } catch (e) {
+        console.warn('Failed to load filter state', e);
+    }
+}
+
+function saveSettingsTabState() {
+    try {
+        localStorage.setItem(SETTINGS_TAB_KEY, settingsTab);
+    } catch (e) {
+        console.warn('Failed to save settings tab', e);
+    }
+}
+
+function loadSettingsTabState() {
+    try {
+        const saved = localStorage.getItem(SETTINGS_TAB_KEY);
+        if (saved && SETTINGS_TABS.includes(saved)) settingsTab = saved;
+    } catch (e) {
+        console.warn('Failed to load settings tab', e);
+    }
+}
+
 function loadStateFromHash() {
     const hash = decodeURIComponent(window.location.hash.slice(1));
     if (hash) {
-        const [view, filter] = hash.split('/');
+        const parts = hash.split('/');
+        const view = parts[0];
         if (['topics', 'sources', 'allnews', 'search', 'filter', 'newonly', 'nav', 'report', 'settings'].includes(view)) {
             currentView = view;
-            currentFilter = filter || 'all';
+            if (currentView === 'settings') {
+                const tab = parts[1];
+                if (tab && SETTINGS_TABS.includes(tab)) {
+                    settingsTab = tab;
+                    saveSettingsTabState();
+                }
+                currentFilter = 'all';
+            } else {
+                currentFilter = parts[1] || 'all';
+                level1Filter = parts[2] || 'all';
+                level2Filter = parts[3] || 'all';
+            }
         }
     }
 }
 
 function saveStateToHash() {
-    window.location.hash = currentFilter !== 'all' ? `${currentView}/${currentFilter}` : currentView;
+    let hash = currentView;
+    // 设置页面保存内部 tab
+    if (currentView === 'settings') {
+        hash += '/' + settingsTab;
+        window.location.hash = hash;
+        return;
+    }
+    // 对于使用两级筛选的页面
+    if (currentView === 'sources' || currentView === 'allnews') {
+        if (level1Filter !== 'all' || level2Filter !== 'all') {
+            hash += '/all/' + level1Filter + '/' + level2Filter;
+        }
+    } else if (currentFilter !== 'all') {
+        hash += '/' + currentFilter;
+    }
+    window.location.hash = hash;
 }
 
 // 主题筛选状态
@@ -343,13 +432,23 @@ let topicCategories = [];
 
 const subTabsConfig = {
     topics: [{ id: 'all', name: '全部' }], // 初始默认值，数据加载后动态更新
-    sources: [{ id: 'all', name: '全部' }, { id: 'news', name: '新闻媒体' }, { id: 'finance', name: '财经投资' }, { id: 'social', name: '社交短视频' }, { id: 'video', name: '影视娱乐' }, { id: 'tech', name: '科技' }, { id: 'community', name: '社区论坛' }, { id: 'game', name: '游戏' }],
-    allnews: [{ id: 'all', name: '全部' }, { id: 'news', name: '新闻媒体' }, { id: 'finance', name: '财经投资' }, { id: 'social', name: '社交短视频' }, { id: 'video', name: '影视娱乐' }, { id: 'tech', name: '科技' }, { id: 'community', name: '社区论坛' }, { id: 'game', name: '游戏' }],
+    sources: { 
+        level1: [{ id: 'all', name: '全部' }, { id: 'hotspot', name: '热点' }, { id: 'rss', name: 'RSS' }],
+        level2: [{ id: 'all', name: '全部' }, { id: 'news', name: '新闻媒体' }, { id: 'finance', name: '财经投资' }, { id: 'social', name: '社交短视频' }, { id: 'video', name: '影视娱乐' }, { id: 'tech', name: '科技' }, { id: 'community', name: '社区论坛' }, { id: 'game', name: '游戏' }]
+    },
+    allnews: { 
+        level1: [{ id: 'all', name: '全部' }, { id: 'hotspot', name: '热点' }, { id: 'rss', name: 'RSS' }],
+        level2: [{ id: 'all', name: '全部' }, { id: 'news', name: '新闻媒体' }, { id: 'finance', name: '财经投资' }, { id: 'social', name: '社交短视频' }, { id: 'video', name: '影视娱乐' }, { id: 'tech', name: '科技' }, { id: 'community', name: '社区论坛' }, { id: 'game', name: '游戏' }]
+    },
     search: [],
     filter: [],
     newonly: [],
     nav: [{ id: 'all', name: '全部主题' }], report: [], settings: []
 };
+
+// 二级筛选状态
+let level1Filter = 'all';  // 一级筛选：all/hotspot/rss
+let level2Filter = 'all';  // 二级筛选：分类
 
 function updateTopicCategories() {
     // 从 topicsData 中提取所有分类
@@ -416,13 +515,31 @@ async function loadDataFromHTML() {
 }
 
 function renderSubTabs() {
-    const tabs = subTabsConfig[currentView] || [];
-    document.getElementById('subHeader').style.display = tabs.length ? 'block' : 'none';
-    // 如果当前 filter 不在 tabs 中，重置为 all
-    if (tabs.length && !tabs.find(t => t.id === currentFilter)) {
-        currentFilter = 'all';
+    const config = subTabsConfig[currentView];
+    const subHeader = document.getElementById('subHeader');
+    const subTabs = document.getElementById('subTabs');
+    
+    // 检查是否是两级筛选配置
+    if (config && config.level1 && config.level2) {
+        subHeader.style.display = 'block';
+        // 渲染两级筛选
+        const level1Html = config.level1.map(t => 
+            `<button class="sub-tab ${t.id === level1Filter ? 'active' : ''}" data-level="1" data-filter="${t.id}">${t.name}</button>`
+        ).join('');
+        const level2Html = config.level2.map(t => 
+            `<button class="sub-tab level2 ${t.id === level2Filter ? 'active' : ''}" data-level="2" data-filter="${t.id}">${t.name}</button>`
+        ).join('');
+        subTabs.innerHTML = level1Html + '<span class="filter-separator">|</span>' + level2Html;
+    } else {
+        // 原有的单级筛选逻辑
+        const tabs = Array.isArray(config) ? config : [];
+        subHeader.style.display = tabs.length ? 'block' : 'none';
+        const isTopicsDefault = currentView === 'topics' && tabs.length === 1 && tabs[0].id === 'all' && topicsData.length === 0;
+        if (!isTopicsDefault && tabs.length && !tabs.find(t => t.id === currentFilter)) {
+            currentFilter = 'all';
+        }
+        subTabs.innerHTML = tabs.map(t => `<button class="sub-tab ${t.id === currentFilter ? 'active' : ''}" data-filter="${t.id}">${t.name}</button>`).join('');
     }
-    document.getElementById('subTabs').innerHTML = tabs.map(t => `<button class="sub-tab ${t.id === currentFilter ? 'active' : ''}" data-filter="${t.id}">${t.name}</button>`).join('');
 }
 
 function renderView() {
@@ -462,15 +579,66 @@ function adjustSingleRowLayout() {
 function renderTopicsView(container) {
     let topics = topicsData.map((t, i) => {
         const meta = topicsMeta[i] || { icon: '📰', theme: 'purple' };
-        return { ...t, icon: meta.icon, theme: meta.theme }; // 不覆盖 category
+        return { ...t, icon: meta.icon, theme: meta.theme };
     });
     if (currentFilter !== 'all') topics = topics.filter(t => t.category === currentFilter);
-    // 隐藏空主题
     const hideEmpty = document.getElementById('hideEmptyTopics')?.checked ?? true;
     if (hideEmpty) topics = topics.filter(t => t.count > 0);
-    container.innerHTML = `<div class="card-grid">${topics.map((t, idx) => `
-        <div class="news-card theme-${t.theme}"><div class="card-header"><div class="card-title-wrap"><div class="card-icon" onclick="showKeywordsPopup(${idx}, event)" style="cursor:pointer" title="点击查看关键词">${t.icon}</div><div><div class="card-title">${t.name}</div><div class="card-subtitle">${t.count} 条新闻</div></div></div><span class="card-count">${t.count}</span></div>
-        <div class="news-list">${(t.news || []).map((n, i) => `<div class="news-item"><span class="news-rank ${i < 3 ? 'top-' + (i+1) : ''}">${n.rank}</span><div class="news-text"><a href="${n.url}" target="_blank" class="news-title-link">${n.title}${n.isNew ? ' <span class="news-new">NEW</span>' : ''}</a><div class="news-meta"><span class="news-source" onclick="jumpToSourceFilter('${n.source}')">${n.source}</span>${formatSubTags(n.matchedTopics, t.name)}</div></div></div>`).join('')}</div></div>`).join('')}</div>`;
+    
+    // 计算总条数
+    const totalCount = topics.reduce((sum, t) => sum + (t.count || 0), 0);
+    
+    container.innerHTML = `<div class="update-info">${topics.length} 个主题，共 ${totalCount} 条</div><div class="card-grid">${topics.map((t, idx) => {
+        const hasNews = (t.newsCount || t.news?.length || 0) > 0;
+        const hasRss = (t.rssCount || t.rss?.length || 0) > 0;
+        const newsCount = t.newsCount || t.news?.length || 0;
+        const rssCount = t.rssCount || t.rss?.length || 0;
+        const defaultTab = hasNews ? 'news' : (hasRss ? 'rss' : 'news');
+        const tabState = topicTabStates[t.name] || defaultTab;
+        
+        return `<div class="news-card theme-${t.theme}">
+            <div class="card-header">
+                <div class="card-title-wrap">
+                    <div class="card-icon" onclick="showKeywordsPopup(${idx}, event)" style="cursor:pointer" title="点击查看关键词">${t.icon}</div>
+                    <div><div class="card-title">${t.name}</div><div class="card-subtitle">${t.count} 条</div></div>
+                </div>
+                <div class="card-tabs">
+                    ${hasNews ? `<span class="card-tab ${tabState === 'news' ? 'active' : ''}" onclick="setTopicTab('${t.name}', 'news')">热榜 ${newsCount}</span>` : ''}
+                    ${hasRss ? `<span class="card-tab ${tabState === 'rss' ? 'active' : ''}" onclick="setTopicTab('${t.name}', 'rss')">RSS ${rssCount}</span>` : ''}
+                </div>
+            </div>
+            <div class="news-list">${renderTopicItems(t, tabState)}</div>
+        </div>`;
+    }).join('')}</div>`;
+}
+
+// 主题卡片内的 Tab 状态
+let topicTabStates = {};
+
+function setTopicTab(topicName, tab) {
+    topicTabStates[topicName] = tab;
+    renderView();
+}
+
+function renderTopicItems(topic, tabState) {
+    const items = tabState === 'rss' ? (topic.rss || []) : (topic.news || []);
+    if (items.length === 0) return '<div class="empty-hint">暂无数据</div>';
+    
+    return items.map((n, i) => {
+        const rankDisplay = tabState === 'rss' ? (i + 1) : n.rank;
+        const timeDisplay = tabState === 'rss' && n.published_at ? `<span class="rss-pub-time">${formatRSSTime(n.published_at)}</span>` : '';
+        return `<div class="news-item">
+            <span class="news-rank ${i < 3 ? 'top-' + (i+1) : ''}">${rankDisplay}</span>
+            <div class="news-text">
+                <a href="${n.url}" target="_blank" class="news-title-link">${n.title}${n.isNew ? ' <span class="news-new">NEW</span>' : ''}</a>
+                <div class="news-meta">
+                    <span class="news-source" onclick="jumpToSourceFilter('${n.source}')">${n.source}</span>
+                    ${timeDisplay}
+                    ${formatSubTags(n.matchedTopics, topic.name)}
+                </div>
+            </div>
+        </div>`;
+    }).join('');
 }
 
 function formatSubTags(matchedTopics, parentTopic) {
@@ -528,16 +696,117 @@ function showKeywordsPopup(topicIdx, event) {
     }, 100);
 }
 
+// 来源卡片内的 Tab 状态
+let sourceTabStates = {};
+
+function setSourceTab(sourceName, tab) {
+    sourceTabStates[sourceName] = tab;
+    renderView();
+}
+
+function getSourceIcon(sourceName) {
+    // 如果是 RSS 来源，提取 [RSS] 后面的名称的首字母
+    if (sourceName.startsWith('[RSS] ')) {
+        const realName = sourceName.substring(6);
+        return realName[0] || 'R';
+    }
+    return sourceName[0];
+}
+
 function renderSourcesView(container) {
-    let sources = sourcesData.map(s => ({ ...s, ...(sourceMeta[s.name] || { icon: s.name[0], theme: 'purple', category: 'news' }) }));
-    if (currentFilter !== 'all') sources = sources.filter(s => s.category === currentFilter);
-    container.innerHTML = `<div class="card-grid">${sources.map(s => `
-        <div class="news-card theme-${s.theme}"><div class="card-header"><div class="card-title-wrap"><div class="card-icon">${s.icon}</div><div><div class="card-title" onclick="jumpToSourceFilter('${s.name}')" style="cursor:pointer">${s.name}</div><div class="card-subtitle">${s.category}</div></div></div><span class="card-count">${s.count}</span></div>
-        <div class="news-list">${(s.news || []).map((n, i) => `<div class="news-item"><span class="news-rank ${i < 3 ? 'top-' + (i+1) : ''}">${i + 1}</span><div class="news-text"><a href="${n.url}" target="_blank" class="news-title-link">${n.title}${n.isNew ? ' <span class="news-new">NEW</span>' : ''}</a><div class="news-meta">${formatMatchedTopics(n.matchedTopics)}</div></div></div>`).join('')}</div></div>`).join('')}</div>`;
+    let sources = sourcesData.map(s => {
+        const isRss = s.name.startsWith('[RSS] ');
+        // 使用后端返回的 category，如果没有则根据 isRss 设置默认值
+        const defaultCategory = isRss ? (s.category || 'tech') : (s.category || 'news');
+        const defaultMeta = { icon: getSourceIcon(s.name), theme: isRss ? 'orange' : 'purple', category: defaultCategory };
+        return { ...s, ...defaultMeta, ...(sourceMeta[s.name] || {}) };
+    });
+    // 一级筛选：全部/热点/RSS
+    if (level1Filter === 'hotspot') sources = sources.filter(s => !s.name.startsWith('[RSS] '));
+    else if (level1Filter === 'rss') sources = sources.filter(s => s.name.startsWith('[RSS] '));
+    // 二级筛选：分类
+    if (level2Filter !== 'all') sources = sources.filter(s => s.category === level2Filter);
+    
+    // 计算筛选后的总数
+    const filteredTotal = sources.reduce((sum, s) => sum + (s.news?.length || 0) + (s.rss?.length || 0), 0);
+    
+    container.innerHTML = `<div class="update-info">${sources.length} 个来源，共 ${filteredTotal} 条</div><div class="card-grid">${sources.map(s => {
+        const hasNews = (s.newsCount || s.news?.length || 0) > 0;
+        const hasRss = (s.rssCount || s.rss?.length || 0) > 0;
+        const newsCount = s.newsCount || s.news?.length || 0;
+        const rssCount = s.rssCount || s.rss?.length || 0;
+        const defaultTab = hasNews ? 'news' : (hasRss ? 'rss' : 'news');
+        const tabState = sourceTabStates[s.name] || defaultTab;
+        
+        return `<div class="news-card theme-${s.theme}">
+            <div class="card-header">
+                <div class="card-title-wrap">
+                    <div class="card-icon">${s.icon}</div>
+                    <div>
+                        <div class="card-title" onclick="jumpToSourceFilter('${s.name}')" style="cursor:pointer">${s.name}</div>
+                        <div class="card-subtitle">${s.category}</div>
+                    </div>
+                </div>
+                <div class="card-tabs">
+                    ${hasNews ? `<span class="card-tab ${tabState === 'news' ? 'active' : ''}" onclick="setSourceTab('${s.name}', 'news')">热榜 ${newsCount}</span>` : ''}
+                    ${hasRss ? `<span class="card-tab ${tabState === 'rss' ? 'active' : ''}" onclick="setSourceTab('${s.name}', 'rss')">RSS ${rssCount}</span>` : ''}
+                </div>
+            </div>
+            <div class="news-list">${renderSourceItems(s, tabState)}</div>
+        </div>`;
+    }).join('')}</div>`;
+}
+
+function renderSourceItems(source, tabState) {
+    const items = tabState === 'rss' ? (source.rss || []) : (source.news || []);
+    if (items.length === 0) return '<div class="empty-hint">暂无数据</div>';
+    
+    return items.map((n, i) => {
+        const timeDisplay = tabState === 'rss' && n.published_at ? `<span class="rss-pub-time">${formatRSSTime(n.published_at)}</span>` : '';
+        return `<div class="news-item">
+            <span class="news-rank ${i < 3 ? 'top-' + (i+1) : ''}">${i + 1}</span>
+            <div class="news-text">
+                <a href="${n.url}" target="_blank" class="news-title-link">${n.title}${n.isNew ? ' <span class="news-new">NEW</span>' : ''}</a>
+                <div class="news-meta">${timeDisplay}${formatMatchedTopics(n.matchedTopics)}</div>
+            </div>
+        </div>`;
+    }).join('');
 }
 
 // 全部新闻数据缓存
 let allNewsData = { sources: [], total: 0, loaded: false };
+
+// RSS 时间格式化
+function formatRSSTime(timeStr) {
+    if (!timeStr) return '';
+    try {
+        const date = new Date(timeStr);
+        const now = new Date();
+        const diff = now - date;
+        if (diff < 3600000) return Math.floor(diff / 60000) + ' 分钟前';
+        if (diff < 86400000) return Math.floor(diff / 3600000) + ' 小时前';
+        if (diff < 604800000) return Math.floor(diff / 86400000) + ' 天前';
+        return date.toLocaleDateString('zh-CN');
+    } catch (e) {
+        return timeStr;
+    }
+}
+
+function truncateSummary(text, maxLen) {
+    if (!text) return '';
+    // 移除 HTML 标签
+    text = text.replace(/<[^>]+>/g, '');
+    if (text.length <= maxLen) return text;
+    return text.substring(0, maxLen) + '...';
+}
+
+// 全部新闻卡片内的 Tab 状态
+let allNewsTabStates = {};
+
+function setAllNewsTab(sourceName, tab) {
+    allNewsTabStates[sourceName] = tab;
+    renderAllNewsContent();
+}
 
 async function renderAllNewsView(container) {
     container.innerHTML = '<div class="loading">加载全部新闻...</div>';
@@ -560,13 +829,70 @@ async function renderAllNewsView(container) {
         }
     }
     
-    let sources = allNewsData.sources.map(s => ({ ...s, ...(sourceMeta[s.name] || { icon: s.name[0], theme: 'purple', category: 'news' }) }));
-    if (currentFilter !== 'all') sources = sources.filter(s => s.category === currentFilter);
+    renderAllNewsContent();
+}
+
+function renderAllNewsContent() {
+    const container = document.getElementById('viewContainer');
+    let sources = allNewsData.sources.map(s => {
+        const isRss = s.name.startsWith('[RSS] ');
+        // 使用后端返回的 category，如果没有则根据 isRss 设置默认值
+        const defaultCategory = isRss ? (s.category || 'tech') : (s.category || 'news');
+        const defaultMeta = { icon: getSourceIcon(s.name), theme: isRss ? 'orange' : 'purple', category: defaultCategory };
+        return { ...s, ...defaultMeta, ...(sourceMeta[s.name] || {}) };
+    });
+    // 一级筛选：全部/热点/RSS
+    if (level1Filter === 'hotspot') sources = sources.filter(s => !s.name.startsWith('[RSS] '));
+    else if (level1Filter === 'rss') sources = sources.filter(s => s.name.startsWith('[RSS] '));
+    // 二级筛选：分类
+    if (level2Filter !== 'all') sources = sources.filter(s => s.category === level2Filter);
     
-    container.innerHTML = `<div class="update-info">共 ${allNewsData.total} 条新闻，${allNewsData.sources.length} 个来源（数据来自数据库，未经关键词过滤）</div>
-    <div class="card-grid">${sources.map(s => `
-        <div class="news-card theme-${s.theme}"><div class="card-header"><div class="card-title-wrap"><div class="card-icon">${s.icon}</div><div><div class="card-title">${s.name}</div><div class="card-subtitle">${s.count} 条</div></div></div><span class="card-count">${s.count}</span></div>
-        <div class="news-list">${(s.news || []).map((n, i) => `<div class="news-item"><span class="news-rank ${n.rank <= 3 ? 'top-' + n.rank : ''}">${n.rank}</span><div class="news-text"><a href="${n.url}" target="_blank" class="news-title-link">${n.title}</a></div></div>`).join('')}</div></div>`).join('')}</div>`;
+    // 计算筛选后的总数
+    const filteredTotal = sources.reduce((sum, s) => sum + (s.news?.length || 0) + (s.rss?.length || 0), 0);
+    
+    container.innerHTML = `<div class="update-info">${sources.length} 个来源，共 ${filteredTotal} 条（数据来自数据库，未经关键词过滤）</div>
+    <div class="card-grid">${sources.map(s => {
+        const hasNews = (s.newsCount || s.news?.length || 0) > 0;
+        const hasRss = (s.rssCount || s.rss?.length || 0) > 0;
+        const newsCount = s.newsCount || s.news?.length || 0;
+        const rssCount = s.rssCount || s.rss?.length || 0;
+        const defaultTab = hasNews ? 'news' : (hasRss ? 'rss' : 'news');
+        const tabState = allNewsTabStates[s.name] || defaultTab;
+        
+        return `<div class="news-card theme-${s.theme}">
+            <div class="card-header">
+                <div class="card-title-wrap">
+                    <div class="card-icon">${s.icon}</div>
+                    <div>
+                        <div class="card-title">${s.name}</div>
+                        <div class="card-subtitle">${s.count} 条</div>
+                    </div>
+                </div>
+                <div class="card-tabs">
+                    ${hasNews ? `<span class="card-tab ${tabState === 'news' ? 'active' : ''}" onclick="setAllNewsTab('${s.name}', 'news')">热榜 ${newsCount}</span>` : ''}
+                    ${hasRss ? `<span class="card-tab ${tabState === 'rss' ? 'active' : ''}" onclick="setAllNewsTab('${s.name}', 'rss')">RSS ${rssCount}</span>` : ''}
+                </div>
+            </div>
+            <div class="news-list">${renderAllNewsItems(s, tabState)}</div>
+        </div>`;
+    }).join('')}</div>`;
+}
+
+function renderAllNewsItems(source, tabState) {
+    const items = tabState === 'rss' ? (source.rss || []) : (source.news || []);
+    if (items.length === 0) return '<div class="empty-hint">暂无数据</div>';
+    
+    return items.map((n, i) => {
+        const rankDisplay = tabState === 'rss' ? (i + 1) : n.rank;
+        const timeDisplay = tabState === 'rss' && n.published_at ? `<span class="rss-pub-time">${formatRSSTime(n.published_at)}</span>` : '';
+        return `<div class="news-item">
+            <span class="news-rank ${(tabState === 'news' && n.rank <= 3) ? 'top-' + n.rank : (i < 3 ? 'top-' + (i+1) : '')}">${rankDisplay}</span>
+            <div class="news-text">
+                <a href="${n.url}" target="_blank" class="news-title-link">${n.title}</a>
+                ${timeDisplay}
+            </div>
+        </div>`;
+    }).join('');
 }
 
 // 搜索相关
@@ -589,15 +915,17 @@ function renderSearchResults() {
         return `<div class="search-hint">未找到包含 "${searchResults.keyword}" 的新闻</div>`;
     }
     return `<div class="search-count">找到 ${searchResults.count} 条包含 "${searchResults.keyword}" 的新闻</div>
-    <div class="search-list">${searchResults.results.map((n, i) => `
-        <div class="search-item">
+    <div class="search-list">${searchResults.results.map((n, i) => {
+        const timeDisplay = n.dataType === 'rss' && n.published_at ? `<span class="rss-pub-time">${formatRSSTime(n.published_at)}</span>` : '';
+        const rankDisplay = n.dataType === 'rss' ? '' : `<span class="rss-pub-time">原排名: ${n.rank}</span>`;
+        return `<div class="search-item">
             <span class="search-rank">${i + 1}</span>
             <div class="search-content">
                 <a href="${n.url}" target="_blank" class="news-title-link">${highlightKeyword(n.title, searchResults.keyword)}</a>
-                <div class="search-meta"><span class="search-source">${n.source}</span><span class="search-original-rank">原排名: ${n.rank}</span></div>
+                <div class="news-meta"><span class="news-source">${n.source}</span>${timeDisplay}${rankDisplay} ${formatMatchedTopics(n.matchedTopics)}</div>
             </div>
-        </div>
-    `).join('')}</div>`;
+        </div>`;
+    }).join('')}</div>`;
 }
 
 function highlightKeyword(text, keyword) {
@@ -640,16 +968,22 @@ function jumpToFilter(topicName, matchedStr) {
     currentFilter = 'all';
     updateMainTabs();
     renderView();
+    saveFilterState();
     saveStateToHash();
 }
 
 function renderNewOnlyView(container) {
-    // 从 sources 数据中收集所有带 isNew 标记的新闻（包含 matchedTopics）
+    // 从 sources 数据中收集所有带 isNew 标记的新闻和 RSS（包含 matchedTopics）
     const newNews = [];
     sourcesData.forEach(source => {
         (source.news || []).forEach(n => {
             if (n.isNew) {
-                newNews.push({ ...n, sourceName: source.name });
+                newNews.push({ ...n, sourceName: source.name, dataType: 'news' });
+            }
+        });
+        (source.rss || []).forEach(n => {
+            if (n.isNew) {
+                newNews.push({ ...n, sourceName: source.name, dataType: 'rss' });
             }
         });
     });
@@ -659,19 +993,30 @@ function renderNewOnlyView(container) {
         return;
     }
     
-    container.innerHTML = `<div class="new-news-grid">${newNews.map((n, i) => `<div class="new-news-item"><span class="news-rank top-1">${i + 1}</span><div class="news-text"><a href="${n.url}" target="_blank" class="news-title-link">${n.title}</a><div class="news-meta"><span class="news-source" onclick="jumpToSourceFilter('${n.sourceName}')">${n.sourceName}</span> ${formatMatchedTopics(n.matchedTopics)}</div></div></div>`).join('')}</div>`;
+    container.innerHTML = `<div class="new-news-grid">${newNews.map((n, i) => {
+        const timeDisplay = n.dataType === 'rss' && n.published_at ? `<span class="rss-pub-time">${formatRSSTime(n.published_at)}</span>` : '';
+        return `<div class="new-news-item"><span class="news-rank top-1">${i + 1}</span><div class="news-text"><a href="${n.url}" target="_blank" class="news-title-link">${n.title}</a><div class="news-meta"><span class="news-source" onclick="jumpToSourceFilter('${n.sourceName}')">${n.sourceName}</span>${timeDisplay} ${formatMatchedTopics(n.matchedTopics)}</div></div></div>`;
+    }).join('')}</div>`;
 }
 
 function renderFilterView(container) {
     const topics = topicsData.map((t, i) => ({ ...t, ...(topicsMeta[i] || { icon: '📰', theme: 'purple' }) }));
-    const sources = sourcesData.map(s => ({ name: s.name, ...(sourceMeta[s.name] || { icon: s.name[0], theme: 'gray' }) }));
+    const sources = sourcesData.map(s => {
+        const isRss = s.name.startsWith('[RSS] ');
+        return { name: s.name, ...(sourceMeta[s.name] || { icon: getSourceIcon(s.name), theme: isRss ? 'orange' : 'gray' }) };
+    });
     
-    // 收集所有新闻
+    // 收集所有新闻和 RSS
     const allNewsMap = new Map();
     sourcesData.forEach(source => {
         (source.news || []).forEach(n => {
             if (!allNewsMap.has(n.title)) {
-                allNewsMap.set(n.title, { ...n, sourceName: source.name });
+                allNewsMap.set(n.title, { ...n, sourceName: source.name, dataType: 'news' });
+            }
+        });
+        (source.rss || []).forEach(n => {
+            if (!allNewsMap.has(n.title)) {
+                allNewsMap.set(n.title, { ...n, sourceName: source.name, dataType: 'rss' });
             }
         });
     });
@@ -681,11 +1026,16 @@ function renderFilterView(container) {
     const hasTopicFilter = selectedTopics.length > 0;
     const hasSourceFilter = selectedSources.length > 0;
     
-    // 只选一个主题且全选时，直接使用该主题的新闻（保持原排序）
+    // 只选一个主题且全选时，直接使用该主题的新闻和RSS（保持原排序）
     if (selectedTopics.length === 1 && selectedTopics[0].keywords === 'all' && !hasSourceFilter) {
         const topicData = topicsData.find(t => t.name === selectedTopics[0].topic);
-        if (topicData && topicData.news) {
-            filteredNews = topicData.news.map(n => ({ ...n, sourceName: n.source }));
+        if (topicData) {
+            if (topicData.news) {
+                filteredNews = filteredNews.concat(topicData.news.map(n => ({ ...n, sourceName: n.source, dataType: 'news' })));
+            }
+            if (topicData.rss) {
+                filteredNews = filteredNews.concat(topicData.rss.map(n => ({ ...n, sourceName: n.source, dataType: 'rss' })));
+            }
         }
     } else if (!hasTopicFilter && !hasSourceFilter) {
         filteredNews = Array.from(allNewsMap.values());
@@ -707,7 +1057,22 @@ function renderFilterView(container) {
             
             // 来源筛选
             if (hasSourceFilter) {
-                sourceMatch = selectedSources.includes(news.sourceName);
+                sourceMatch = false;  // 先设为 false
+                // 处理特殊筛选项
+                const hasHotspot = selectedSources.includes('__hotspot__');
+                const hasRss = selectedSources.includes('__rss__');
+                const normalSources = selectedSources.filter(s => !s.startsWith('__'));
+                
+                // 任一条件满足即可
+                if (hasHotspot && news.dataType === 'news') {
+                    sourceMatch = true;
+                }
+                if (hasRss && news.dataType === 'rss') {
+                    sourceMatch = true;
+                }
+                if (normalSources.length > 0 && normalSources.includes(news.sourceName)) {
+                    sourceMatch = true;
+                }
             }
             
             // 组合筛选
@@ -760,13 +1125,22 @@ function renderFilterView(container) {
                 </div>
                 <div class="filter-header sub"><span class="filter-label">来源：</span></div>
                 <div class="filter-topics-row">
+                    <span class="filter-topic-chip ${selectedSources.includes('__hotspot__') ? 'has-selection' : ''}" onclick="toggleSourceFilter('__hotspot__')">
+                        <span class="filter-topic-name ${selectedSources.includes('__hotspot__') ? 'selected' : ''}">🔥 热榜</span>
+                    </span>
+                    <span class="filter-topic-chip ${selectedSources.includes('__rss__') ? 'has-selection' : ''}" onclick="toggleSourceFilter('__rss__')">
+                        <span class="filter-topic-name ${selectedSources.includes('__rss__') ? 'selected' : ''}">📡 RSS</span>
+                    </span>
                     ${sources.map(s => `<span class="filter-topic-chip ${selectedSources.includes(s.name) ? 'has-selection' : ''}" onclick="toggleSourceFilter('${s.name}')">
                         <span class="filter-topic-name ${selectedSources.includes(s.name) ? 'selected' : ''}">${s.name}</span>
                     </span>`).join('')}
                 </div>
             </div>
         </div>
-        <div class="new-news-grid">${filteredNews.map((n, i) => `<div class="new-news-item"><span class="news-rank">${i + 1}</span><div class="news-text"><a href="${n.url}" target="_blank" class="news-title-link">${n.title}${n.isNew ? ' <span class="news-new">NEW</span>' : ''}</a><div class="news-meta"><span class="news-source" onclick="jumpToSourceFilter('${n.sourceName}')">${n.sourceName}</span> ${formatMatchedTopics(n.matchedTopics)}</div></div></div>`).join('')}</div>
+        <div class="new-news-grid">${filteredNews.map((n, i) => {
+            const timeDisplay = n.dataType === 'rss' && n.published_at ? `<span class="rss-pub-time">${formatRSSTime(n.published_at)}</span>` : '';
+            return `<div class="new-news-item"><span class="news-rank">${i + 1}</span><div class="news-text"><a href="${n.url}" target="_blank" class="news-title-link">${n.title}${n.isNew ? ' <span class="news-new">NEW</span>' : ''}</a><div class="news-meta"><span class="news-source" onclick="jumpToSourceFilter('${n.sourceName}')">${n.sourceName}</span>${timeDisplay} ${formatMatchedTopics(n.matchedTopics)}</div></div></div>`;
+        }).join('')}</div>
     `;
 }
 
@@ -813,11 +1187,13 @@ function selectAllKw(topicName) {
     if (idx >= 0) selectedTopics[idx].keywords = 'all';
     else selectedTopics.push({ topic: topicName, keywords: 'all' });
     renderView();
+    saveFilterState();
 }
 
 function clearTopicKw(topicName) {
     selectedTopics = selectedTopics.filter(t => t.topic !== topicName);
     renderView();
+    saveFilterState();
 }
 
 function toggleTopicAll(topicName) {
@@ -830,6 +1206,7 @@ function toggleTopicAll(topicName) {
         selectedTopics.push({ topic: topicName, keywords: 'all' });
     }
     renderView();
+    saveFilterState();
 }
 
 function toggleKeyword(topicName, keyword) {
@@ -854,6 +1231,7 @@ function toggleKeyword(topicName, keyword) {
         }
     }
     renderView();
+    saveFilterState();
 }
 
 function toggleTopicFilter(topicName) {
@@ -863,11 +1241,13 @@ function toggleTopicFilter(topicName) {
 function setFilterMode(mode) {
     filterMode = mode;
     renderView();
+    saveFilterState();
 }
 
 function clearTopicFilter() {
     selectedTopics = [];
     renderView();
+    saveFilterState();
 }
 
 function toggleSourceFilter(sourceName) {
@@ -875,17 +1255,20 @@ function toggleSourceFilter(sourceName) {
     if (idx >= 0) selectedSources.splice(idx, 1);
     else selectedSources.push(sourceName);
     renderView();
+    saveFilterState();
 }
 
 function clearAllFilter() {
     selectedTopics = [];
     selectedSources = [];
     renderView();
+    saveFilterState();
 }
 
 function toggleFilterPanel() {
     filterPanelExpanded = !filterPanelExpanded;
     renderView();
+    saveFilterState();
 }
 
 function jumpToSourceFilter(sourceName) {
@@ -895,6 +1278,7 @@ function jumpToSourceFilter(sourceName) {
     currentFilter = 'all';
     updateMainTabs();
     renderView();
+    saveFilterState();
     saveStateToHash();
 }
 
@@ -909,6 +1293,7 @@ function renderNavView(container) {
 
 // 设置页面相关变量
 let settingsData = { frequencyWords: '', platforms: [], tabs: [] };
+let settingsTab = 'platforms'; // 设置页面当前 tab
 
 // 默认模块配置
 const defaultTabs = [
@@ -924,15 +1309,16 @@ const defaultTabs = [
 ];
 
 async function renderSettingsView(container) {
+    const isActive = (tab) => settingsTab === tab ? 'active' : '';
     container.innerHTML = `<div class="settings-container">
         <div class="settings-tabs">
-            <button class="settings-tab active" data-tab="platforms">来源排序</button>
-            <button class="settings-tab" data-tab="topicsorder">主题排序</button>
-            <button class="settings-tab" data-tab="topics">主题关键词</button>
-            <button class="settings-tab" data-tab="tabs">模块排序</button>
+            <button class="settings-tab ${isActive('platforms')}" data-tab="platforms">来源排序</button>
+            <button class="settings-tab ${isActive('topicsorder')}" data-tab="topicsorder">主题排序</button>
+            <button class="settings-tab ${isActive('topics')}" data-tab="topics">主题关键词</button>
+            <button class="settings-tab ${isActive('tabs')}" data-tab="tabs">模块排序</button>
         </div>
         <div class="settings-content">
-            <div id="settingsPlatforms" class="settings-panel active">
+            <div id="settingsPlatforms" class="settings-panel ${isActive('platforms')}">
                 <div class="settings-header">
                     <h3>来源排序</h3>
                     <div class="settings-actions">
@@ -945,7 +1331,7 @@ async function renderSettingsView(container) {
                 </div>
                 <div id="platformsList" class="platforms-list">加载中...</div>
             </div>
-            <div id="settingsTopicsorder" class="settings-panel">
+            <div id="settingsTopicsorder" class="settings-panel ${isActive('topicsorder')}">
                 <div class="settings-header">
                     <h3>主题排序</h3>
                     <div class="settings-actions">
@@ -958,7 +1344,7 @@ async function renderSettingsView(container) {
                 </div>
                 <div id="topicsOrderList" class="platforms-list">加载中...</div>
             </div>
-            <div id="settingsTopics" class="settings-panel">
+            <div id="settingsTopics" class="settings-panel ${isActive('topics')}">
                 <div class="settings-header">
                     <h3>主题关键词配置</h3>
                     <div class="settings-actions">
@@ -978,7 +1364,7 @@ async function renderSettingsView(container) {
                 </div>
                 <textarea id="frequencyWordsEditor" class="settings-editor" placeholder="加载中..."></textarea>
             </div>
-            <div id="settingsTabs" class="settings-panel">
+            <div id="settingsTabs" class="settings-panel ${isActive('tabs')}">
                 <div class="settings-header">
                     <h3>模块排序</h3>
                     <div class="settings-actions">
@@ -997,6 +1383,9 @@ async function renderSettingsView(container) {
     // 绑定标签切换
     container.querySelectorAll('.settings-tab').forEach(tab => {
         tab.addEventListener('click', () => {
+            settingsTab = tab.dataset.tab; // 保存当前 tab 状态
+            saveSettingsTabState();
+            saveStateToHash(); // 保存到 URL hash
             container.querySelectorAll('.settings-tab').forEach(t => t.classList.remove('active'));
             container.querySelectorAll('.settings-panel').forEach(p => p.classList.remove('active'));
             tab.classList.add('active');
@@ -1065,12 +1454,13 @@ function renderPlatformsList(platforms) {
     const container = document.getElementById('platformsList');
     if (!container) return;
     container.innerHTML = platforms.map((p, i) => `
-            <div class="platform-item" draggable="true" data-index="${i}">
+            <div class="platform-item ${p.isRss ? 'rss-source' : ''}" draggable="true" data-index="${i}" data-is-rss="${p.isRss || false}">
                 <span class="platform-drag">☰</span>
                 <label class="platform-checkbox">
                     <input type="checkbox" ${p.enabled !== false ? 'checked' : ''} data-id="${p.id}">
                     <span class="platform-name">${p.name}</span>
                     <span class="platform-id">${p.id}</span>
+                    ${p.isRss ? '<span class="platform-rss-tag">RSS</span>' : ''}
                 </label>
             </div>
         `).join('');
@@ -1091,22 +1481,36 @@ function renderPlatformsList(platforms) {
 async function savePlatforms() {
     const container = document.getElementById('platformsList');
     const platforms = [];
+    const rssFeeds = [];
+    
     container.querySelectorAll('.platform-item').forEach(item => {
         const checkbox = item.querySelector('input[type="checkbox"]');
         const id = checkbox.dataset.id;
         const name = item.querySelector('.platform-name').textContent;
-        platforms.push({ 
-            id, 
-            name,
-            enabled: checkbox.checked 
-        });
+        const isRss = item.dataset.isRss === 'true';
+        
+        if (isRss) {
+            // RSS 源 - 去掉 [RSS] 前缀保存
+            const realName = name.startsWith('[RSS] ') ? name.substring(6) : name;
+            rssFeeds.push({ 
+                id, 
+                name: realName,
+                enabled: checkbox.checked 
+            });
+        } else {
+            platforms.push({ 
+                id, 
+                name,
+                enabled: checkbox.checked 
+            });
+        }
     });
     
     try {
         const res = await fetch('/api/config/platforms', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ platforms })
+            body: JSON.stringify({ platforms, rssFeeds })
         });
         const data = await res.json();
         if (data.success) {
@@ -1406,14 +1810,30 @@ async function triggerCrawl() {
     }
 }
 
-document.querySelectorAll('.main-tab').forEach(tab => tab.addEventListener('click', () => { currentView = tab.dataset.view; currentFilter = 'all'; saveStateToHash(); renderView(); updateMainTabs(); }));
-document.getElementById('subTabs').addEventListener('click', e => { if (e.target.classList.contains('sub-tab')) { currentFilter = e.target.dataset.filter; saveStateToHash(); renderSubTabs(); renderView(); } });
+document.querySelectorAll('.main-tab').forEach(tab => tab.addEventListener('click', () => { currentView = tab.dataset.view; currentFilter = 'all'; level1Filter = 'all'; level2Filter = 'all'; saveStateToHash(); renderView(); updateMainTabs(); }));
+document.getElementById('subTabs').addEventListener('click', e => { 
+    if (e.target.classList.contains('sub-tab')) { 
+        const level = e.target.dataset.level;
+        const filter = e.target.dataset.filter;
+        if (level === '1') {
+            level1Filter = filter;
+        } else if (level === '2') {
+            level2Filter = filter;
+        } else {
+            // 兼容旧的单级筛选
+            currentFilter = filter;
+        }
+        saveStateToHash(); 
+        renderSubTabs(); 
+        renderView(); 
+    } 
+});
 window.addEventListener('hashchange', () => { loadStateFromHash(); renderView(); updateMainTabs(); });
 window.addEventListener('resize', () => setTimeout(adjustSingleRowLayout, 100));
 // 点击其他地方关闭菜单
 document.addEventListener('click', e => { if (!e.target.closest('.actions-dropdown')) closeActionsMenu(); });
 
-loadStateFromHash(); updateMainTabs(); loadDisplaySettings(); loadData().then(() => { loadStateFromHash(); renderView(); updateMainTabs(); }); setupAutoRefresh();
+loadSettingsTabState(); loadFilterState(); loadStateFromHash(); updateMainTabs(); loadDisplaySettings(); renderView(); loadData().then(() => { renderView(); updateMainTabs(); }); setupAutoRefresh();
 // 页面加载时应用模块顺序
 fetch('/api/config/tabs').then(r => r.json()).then(data => { if (data.success && data.tabs) applyTabsOrder(data.tabs); }).catch(() => {});
 </script>
