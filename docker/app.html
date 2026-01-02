@@ -138,6 +138,20 @@
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         .auto-refresh-select { padding: 8px 12px; border-radius: 8px; border: none; background: rgba(255,255,255,0.1); color: var(--text-primary); font-size: 12px; cursor: pointer; }
         .auto-refresh-select option { background: var(--bg-secondary); }
+        .actions-dropdown { position: relative; }
+        .actions-btn { padding: 8px 16px; border-radius: 8px; border: none; background: linear-gradient(135deg, #7c3aed, #3b82f6); color: white; cursor: pointer; font-size: 13px; font-weight: 500; }
+        .actions-btn:hover { opacity: 0.9; }
+        .actions-menu { display: none; position: absolute; top: 100%; right: 0; margin-top: 8px; background: var(--bg-card); border: 1px solid rgba(255,255,255,0.15); border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); min-width: 180px; z-index: 1000; padding: 8px 0; }
+        .actions-menu.show { display: block; }
+        .actions-menu button { display: block; width: 100%; padding: 10px 16px; border: none; background: transparent; color: var(--text-primary); font-size: 13px; text-align: left; cursor: pointer; }
+        .actions-menu button:hover { background: rgba(255,255,255,0.1); }
+        .menu-divider { height: 1px; background: rgba(255,255,255,0.1); margin: 8px 0; }
+        .menu-checkbox { display: flex; align-items: center; gap: 8px; padding: 10px 16px; font-size: 13px; color: var(--text-primary); cursor: pointer; }
+        .menu-checkbox:hover { background: rgba(255,255,255,0.1); }
+        .menu-checkbox input { width: 16px; height: 16px; accent-color: var(--accent); }
+        .menu-label { padding: 6px 16px; font-size: 11px; color: var(--text-secondary); text-transform: uppercase; }
+        .menu-select { width: calc(100% - 32px); margin: 0 16px 8px; padding: 8px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); background: var(--bg-secondary); color: var(--text-primary); font-size: 12px; }
+        .menu-select option { background: var(--bg-secondary); }
         .update-time-header { font-size: 12px; color: var(--text-secondary); padding: 6px 12px; background: rgba(255,255,255,0.05); border-radius: 6px; }
         @media (max-width: 768px) { .header-content { flex-direction: column; } .card-grid, .topics-nav-grid { grid-template-columns: 1fr; } .news-card { height: 360px; } }
         .loading { text-align: center; padding: 40px; color: var(--text-secondary); }
@@ -221,15 +235,24 @@
         </nav>
         <div class="header-actions">
             <span class="update-time-header">更新: <span id="updateTime">加载中...</span></span>
-            <button id="crawlBtn" class="crawl-btn" title="立即爬取新数据">🕷️ 爬取</button>
-            <button id="clearCacheBtn" class="crawl-btn" title="清除服务器缓存" style="background: linear-gradient(135deg, #f97316, #ea580c);">🗑️ 刷新缓存</button>
-            <button id="refreshBtn" class="refresh-btn" title="刷新数据">🔄</button>
-            <select id="autoRefresh" class="auto-refresh-select">
-                <option value="0">手动刷新</option>
-                <option value="60">1分钟</option>
-                <option value="300" selected>5分钟</option>
-                <option value="600">10分钟</option>
-            </select>
+            <div class="actions-dropdown">
+                <button class="actions-btn" onclick="toggleActionsMenu()">⚙️ 操作 ▼</button>
+                <div class="actions-menu" id="actionsMenu">
+                    <button onclick="triggerCrawl(); closeActionsMenu();">🕷️ 立即爬取</button>
+                    <button onclick="clearServerCache(); closeActionsMenu();">🗑️ 刷新缓存</button>
+                    <button onclick="refreshData(); closeActionsMenu();">🔄 刷新数据</button>
+                    <div class="menu-divider"></div>
+                    <label class="menu-checkbox"><input type="checkbox" id="hideEmptyTopics" checked onchange="saveDisplaySettings(); renderView();">隐藏空主题</label>
+                    <div class="menu-divider"></div>
+                    <div class="menu-label">自动刷新</div>
+                    <select id="autoRefresh" class="menu-select" onchange="setupAutoRefresh()">
+                        <option value="0">手动刷新</option>
+                        <option value="60">1分钟</option>
+                        <option value="300" selected>5分钟</option>
+                        <option value="600">10分钟</option>
+                    </select>
+                </div>
+            </div>
         </div>
     </div>
 </header>
@@ -442,6 +465,9 @@ function renderTopicsView(container) {
         return { ...t, icon: meta.icon, theme: meta.theme }; // 不覆盖 category
     });
     if (currentFilter !== 'all') topics = topics.filter(t => t.category === currentFilter);
+    // 隐藏空主题
+    const hideEmpty = document.getElementById('hideEmptyTopics')?.checked ?? true;
+    if (hideEmpty) topics = topics.filter(t => t.count > 0);
     container.innerHTML = `<div class="card-grid">${topics.map((t, idx) => `
         <div class="news-card theme-${t.theme}"><div class="card-header"><div class="card-title-wrap"><div class="card-icon" onclick="showKeywordsPopup(${idx}, event)" style="cursor:pointer" title="点击查看关键词">${t.icon}</div><div><div class="card-title">${t.name}</div><div class="card-subtitle">${t.count} 条新闻</div></div></div><span class="card-count">${t.count}</span></div>
         <div class="news-list">${(t.news || []).map((n, i) => `<div class="news-item"><span class="news-rank ${i < 3 ? 'top-' + (i+1) : ''}">${n.rank}</span><div class="news-text"><a href="${n.url}" target="_blank" class="news-title-link">${n.title}${n.isNew ? ' <span class="news-new">NEW</span>' : ''}</a><div class="news-meta"><span class="news-source" onclick="jumpToSourceFilter('${n.source}')">${n.source}</span>${formatSubTags(n.matchedTopics, t.name)}</div></div></div>`).join('')}</div></div>`).join('')}</div>`;
@@ -873,7 +899,10 @@ function jumpToSourceFilter(sourceName) {
 }
 
 function renderNavView(container) {
-    const topics = topicsData.map((t, i) => ({ ...t, ...(topicsMeta[i] || { icon: '📰', theme: 'purple', category: 'other' }) }));
+    let topics = topicsData.map((t, i) => ({ ...t, ...(topicsMeta[i] || { icon: '📰', theme: 'purple', category: 'other' }) }));
+    // 隐藏空主题
+    const hideEmpty = document.getElementById('hideEmptyTopics')?.checked ?? true;
+    if (hideEmpty) topics = topics.filter(t => t.count > 0);
     container.innerHTML = `<div class="topics-nav-grid">${topics.map((t, i) => `
         <div class="topic-nav-card" onclick="switchToTopic(${i})"><div class="topic-nav-header"><div class="topic-nav-icon card-icon theme-${t.theme}" style="background:linear-gradient(135deg,var(--accent),#3b82f6)">${t.icon}</div><div><div class="topic-nav-title">${t.name}</div><div class="topic-nav-keywords">${t.count} 条新闻</div></div></div><div class="topic-nav-stats"><span>${t.category}</span><span class="topic-nav-btn">查看详情 →</span></div></div>`).join('')}</div>`;
 }
@@ -1311,20 +1340,30 @@ function switchToTopic(idx) {
     saveStateToHash();
 }
 function updateMainTabs() { document.querySelectorAll('.main-tab').forEach(t => t.classList.toggle('active', t.dataset.view === currentView)); }
-function refreshData() { const btn = document.getElementById('refreshBtn'); btn.classList.add('loading'); allNewsData.loaded = false; loadData().finally(() => btn.classList.remove('loading')); }
+function refreshData() { allNewsData.loaded = false; loadData(); }
 function setupAutoRefresh() { const interval = parseInt(document.getElementById('autoRefresh').value) * 1000; if (autoRefreshTimer) clearInterval(autoRefreshTimer); if (interval > 0) autoRefreshTimer = setInterval(refreshData, interval); }
 
+// 下拉菜单控制
+function toggleActionsMenu() { document.getElementById('actionsMenu').classList.toggle('show'); }
+function closeActionsMenu() { document.getElementById('actionsMenu').classList.remove('show'); }
+
+// 显示设置
+function saveDisplaySettings() {
+    const hideEmpty = document.getElementById('hideEmptyTopics').checked;
+    localStorage.setItem('hideEmptyTopics', hideEmpty);
+}
+function loadDisplaySettings() {
+    const hideEmpty = localStorage.getItem('hideEmptyTopics');
+    if (hideEmpty !== null) {
+        document.getElementById('hideEmptyTopics').checked = hideEmpty === 'true';
+    }
+}
+
 async function clearServerCache() {
-    const btn = document.getElementById('clearCacheBtn');
-    if (btn.classList.contains('loading')) return;
-    const originalText = btn.innerHTML;
-    btn.classList.add('loading');
-    btn.innerHTML = '🗑️ 刷新中...';
     try {
+        showToast('正在刷新缓存...');
         const res = await fetch('/api/refresh');
         const data = await res.json();
-        btn.classList.remove('loading');
-        btn.innerHTML = originalText;
         if (data.success) {
             showToast('缓存已刷新！');
             allNewsData.loaded = false;
@@ -1333,54 +1372,48 @@ async function clearServerCache() {
             alert('刷新缓存失败: ' + (data.error || '未知错误'));
         }
     } catch (e) {
-        btn.classList.remove('loading');
-        btn.innerHTML = originalText;
         alert('请求失败: ' + e.message);
     }
 }
 
+let crawlRunning = false;
 async function triggerCrawl() {
-    const btn = document.getElementById('crawlBtn');
-    if (btn.classList.contains('loading')) return;
-    btn.classList.add('loading');
-    btn.textContent = '🕷️ 爬取中';
+    if (crawlRunning) return;
+    crawlRunning = true;
     try {
+        showToast('正在启动爬虫...');
         const res = await fetch('/api/crawl');
         const data = await res.json();
         if (data.success) {
+            showToast('爬虫已启动，请稍候...');
             const checkStatus = setInterval(async () => {
                 const statusRes = await fetch('/api/crawl_status');
                 const status = await statusRes.json();
                 if (!status.running) {
                     clearInterval(checkStatus);
-                    btn.classList.remove('loading');
-                    btn.textContent = '🕷️ 爬取';
-                    showToast('爬取完成');
+                    crawlRunning = false;
+                    showToast('爬取完成！');
                     refreshData();
                 }
             }, 3000);
         } else {
-            btn.classList.remove('loading');
-            btn.textContent = '🕷️ 爬取';
+            crawlRunning = false;
             alert(data.message || '启动失败');
         }
     } catch (e) {
-        btn.classList.remove('loading');
-        btn.innerHTML = originalText;
+        crawlRunning = false;
         alert('请求失败: ' + e.message);
     }
 }
 
 document.querySelectorAll('.main-tab').forEach(tab => tab.addEventListener('click', () => { currentView = tab.dataset.view; currentFilter = 'all'; saveStateToHash(); renderView(); updateMainTabs(); }));
 document.getElementById('subTabs').addEventListener('click', e => { if (e.target.classList.contains('sub-tab')) { currentFilter = e.target.dataset.filter; saveStateToHash(); renderSubTabs(); renderView(); } });
-document.getElementById('refreshBtn').addEventListener('click', refreshData);
-document.getElementById('crawlBtn').addEventListener('click', triggerCrawl);
-document.getElementById('clearCacheBtn').addEventListener('click', clearServerCache);
-document.getElementById('autoRefresh').addEventListener('change', setupAutoRefresh);
 window.addEventListener('hashchange', () => { loadStateFromHash(); renderView(); updateMainTabs(); });
 window.addEventListener('resize', () => setTimeout(adjustSingleRowLayout, 100));
+// 点击其他地方关闭菜单
+document.addEventListener('click', e => { if (!e.target.closest('.actions-dropdown')) closeActionsMenu(); });
 
-loadStateFromHash(); updateMainTabs(); loadData().then(() => { loadStateFromHash(); renderView(); updateMainTabs(); }); setupAutoRefresh();
+loadStateFromHash(); updateMainTabs(); loadDisplaySettings(); loadData().then(() => { loadStateFromHash(); renderView(); updateMainTabs(); }); setupAutoRefresh();
 // 页面加载时应用模块顺序
 fetch('/api/config/tabs').then(r => r.json()).then(data => { if (data.success && data.tabs) applyTabsOrder(data.tabs); }).catch(() => {});
 </script>

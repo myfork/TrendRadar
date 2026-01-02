@@ -411,13 +411,176 @@ def parse_index_html():
     return update_time, topics, sources_list
 
 
-def refresh_cache():
-    """刷新缓存"""
-    global cache
-    index_file = OUTPUT_DIR / "index.html"
+def get_data_from_db():
+    """
+    从数据库获取新闻数据，按主题和来源分组
+    不依赖 index.html，直接使用 frequency_helper 进行关键词匹配
+    """
+    import sqlite3
+    
+    # 获取今天的数据库路径
+    today = datetime.now().strftime("%Y-%m-%d")
+    db_path = OUTPUT_DIR / "news" / f"{today}.db"
+    
+    if not db_path.exists():
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Database not found: {db_path}")
+        return None, None, None
+    
+    # 加载频率词配置
+    word_groups, filter_words, global_filters = load_frequency_config()
+    if not word_groups:
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] No word groups loaded")
+        return None, None, None
+    
+    # 读取平台配置
+    config = get_combined_config()
+    platforms_config = config.get('platforms', [])
+    platform_order = {}
+    platform_names = {}
+    platform_enabled = {}
+    for i, p in enumerate(platforms_config):
+        platform_order[p['id']] = i
+        platform_names[p['id']] = p['name']
+        platform_enabled[p['id']] = p.get('enabled', True)
     
     try:
-        update_time, topics, sources = parse_index_html()
+        conn = sqlite3.connect(str(db_path))
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        # 查询所有新闻
+        cursor.execute("""
+            SELECT n.title, n.url, n.rank, n.platform_id, p.name as platform_name,
+                   n.first_crawl_time, n.last_crawl_time
+            FROM news_items n
+            LEFT JOIN platforms p ON n.platform_id = p.id
+            ORDER BY n.platform_id, n.rank
+        """)
+        rows = cursor.fetchall()
+        
+        # 获取最新爬取时间作为更新时间
+        cursor.execute("SELECT MAX(last_crawl_time) as latest FROM news_items")
+        latest_row = cursor.fetchone()
+        update_time = latest_row['latest'] if latest_row and latest_row['latest'] else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        conn.close()
+        
+        # 判断新闻是否为"新增"（first_crawl_time 在最近1小时内）
+        from datetime import timedelta
+        now = datetime.now()
+        one_hour_ago = now - timedelta(hours=1)
+        
+        # 初始化主题数据结构
+        topics = []
+        for i, group in enumerate(word_groups):
+            topics.append({
+                "id": i,
+                "name": group["group_key"],
+                "keywords": group.get("keywords", []),
+                "category": group.get("category", "其他"),
+                "filter": group.get("filter", []),
+                "count": 0,
+                "news": []
+            })
+        
+        # 按来源分组的数据
+        sources_dict = {}
+        
+        # 用于去重（同一新闻可能匹配多个主题）
+        topic_news_seen = {i: set() for i in range(len(topics))}
+        
+        # 处理每条新闻
+        for row in rows:
+            platform_id = row['platform_id']
+            platform_name = platform_names.get(platform_id, row['platform_name'] or platform_id)
+            
+            # 跳过禁用的平台
+            if not platform_enabled.get(platform_id, True):
+                continue
+            
+            title = row['title']
+            url = row['url']
+            rank = row['rank']
+            
+            # 判断是否为新增新闻
+            is_new = False
+            if row['first_crawl_time']:
+                try:
+                    first_time = datetime.strptime(row['first_crawl_time'], "%Y-%m-%d %H:%M:%S")
+                    is_new = first_time > one_hour_ago
+                except:
+                    pass
+            
+            # 使用 frequency_helper 匹配主题
+            matched_topics = find_matched_topics(title, word_groups, filter_words, global_filters)
+            
+            news_item = {
+                "title": title,
+                "url": url,
+                "rank": rank,
+                "source": platform_name,
+                "isNew": is_new,
+                "matchedTopics": matched_topics
+            }
+            
+            # 添加到匹配的主题中
+            for mt in matched_topics:
+                topic_name = mt["topic"]
+                # 找到对应的主题索引
+                for i, topic in enumerate(topics):
+                    if topic["name"] == topic_name:
+                        # 去重：同一标题不重复添加到同一主题
+                        if title not in topic_news_seen[i]:
+                            topic_news_seen[i].add(title)
+                            topics[i]["news"].append(news_item.copy())
+                        break
+            
+            # 添加到来源分组（只要新闻匹配了任意主题就添加）
+            if matched_topics:
+                if platform_name not in sources_dict:
+                    sources_dict[platform_name] = {
+                        "id": platform_id,
+                        "name": platform_name,
+                        "order": platform_order.get(platform_id, 999),
+                        "news": []
+                    }
+                sources_dict[platform_name]["news"].append(news_item)
+        
+        # 更新主题的 count 并按热度排序新闻
+        for topic in topics:
+            # 按 rank 排序
+            topic["news"].sort(key=lambda x: x.get("rank", 999))
+            topic["count"] = len(topic["news"])
+        
+        # 按配置顺序排序来源
+        sources_list = sorted(sources_dict.values(), key=lambda x: x['order'])
+        for s in sources_list:
+            s['count'] = len(s['news'])
+            del s['order']
+        
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] DB data loaded: {len(topics)} topics, {len(sources_list)} sources, {sum(t['count'] for t in topics)} matched news")
+        return update_time, topics, sources_list
+        
+    except Exception as e:
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] get_data_from_db error: {e}")
+        import traceback
+        traceback.print_exc()
+        return None, None, None
+
+
+def refresh_cache():
+    """刷新缓存 - 优先使用数据库，失败时回退到 HTML 解析"""
+    global cache
+    
+    try:
+        # 优先从数据库获取数据
+        update_time, topics, sources = get_data_from_db()
+        
+        # 如果数据库方式失败，回退到 HTML 解析
+        if topics is None:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] DB method failed, falling back to HTML parsing...")
+            update_time, topics, sources = parse_index_html()
+        
         if topics is not None:
             # 应用主题顺序配置
             topics = apply_topics_order(topics)
@@ -425,12 +588,14 @@ def refresh_cache():
                 cache["update_time"] = update_time
                 cache["topics"] = topics
                 cache["sources"] = sources
-                cache["last_modified"] = index_file.stat().st_mtime if index_file.exists() else 0
+                cache["last_modified"] = time.time()
                 cache["cache_time"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             print(f"[{datetime.now().strftime('%H:%M:%S')}] Cache refreshed: {len(topics)} topics, {len(sources)} sources")
             return True
     except Exception as e:
         print(f"[{datetime.now().strftime('%H:%M:%S')}] Cache refresh error: {e}")
+        import traceback
+        traceback.print_exc()
     return False
 
 
@@ -474,18 +639,40 @@ def apply_topics_order(topics):
 
 
 def watch_file():
-    """监听 index.html 文件变化"""
-    index_file = OUTPUT_DIR / "index.html"
-    last_mtime = cache["last_modified"]
+    """监听数据库文件和配置文件变化"""
+    last_db_mtime = 0
+    last_freq_mtime = 0
     
     while True:
         try:
-            if index_file.exists():
-                current_mtime = index_file.stat().st_mtime
-                if current_mtime > last_mtime:
-                    print(f"[{datetime.now().strftime('%H:%M:%S')}] index.html changed, refreshing cache...")
-                    refresh_cache()
-                    last_mtime = current_mtime
+            # 监听今天的数据库文件
+            today = datetime.now().strftime("%Y-%m-%d")
+            db_path = OUTPUT_DIR / "news" / f"{today}.db"
+            
+            # 监听 frequency_words.txt
+            freq_file = FREQUENCY_WORDS_FILE
+            
+            need_refresh = False
+            
+            if db_path.exists():
+                current_db_mtime = db_path.stat().st_mtime
+                if current_db_mtime > last_db_mtime:
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] Database changed, refreshing cache...")
+                    last_db_mtime = current_db_mtime
+                    need_refresh = True
+            
+            if freq_file.exists():
+                current_freq_mtime = freq_file.stat().st_mtime
+                if current_freq_mtime > last_freq_mtime:
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] frequency_words.txt changed, refreshing cache...")
+                    last_freq_mtime = current_freq_mtime
+                    # 重置频率词缓存
+                    frequency_cache["last_modified"] = 0
+                    need_refresh = True
+            
+            if need_refresh:
+                refresh_cache()
+                
         except Exception as e:
             print(f"[{datetime.now().strftime('%H:%M:%S')}] Watch error: {e}")
         time.sleep(5)  # 每5秒检查一次

@@ -58,10 +58,10 @@ Optimus
 /高通|Qualcomm/i => 高通
 
 #AR/VR @硬件设备
-/\bAR\b/i => AR
-/\bVR\b/i => VR
-/\bMR\b/i => MR
-/\bXR\b/i => XR
+/(?<![a-zA-Z])AR(?![a-zA-Z])/i => AR
+/(?<![a-zA-Z])VR(?![a-zA-Z])/i => VR
+/(?<![a-zA-Z])MR(?![a-zA-Z])/i => MR
+/(?<![a-zA-Z])XR(?![a-zA-Z])/i => XR
 智能眼镜
 智能手表
 可穿戴
