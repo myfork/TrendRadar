@@ -275,6 +275,37 @@ def get_combined_config():
         config['ui_tabs'] = user_settings['ui_tabs']
     if 'topics_order' in user_settings:
         config['topics_order'] = user_settings['topics_order']
+    if 'rss' in user_settings:
+        # 智能合并 RSS 配置：使用 user_settings 的顺序和 enabled 状态，但保留 config 中新增的源
+        user_rss = user_settings['rss']
+        config_rss = config.get('rss', {})
+        config_feeds = config_rss.get('feeds', [])
+        user_feeds = user_rss.get('feeds', [])
+        
+        # 创建映射
+        user_feeds_map = {f['id']: f for f in user_feeds}
+        config_feeds_map = {f['id']: f for f in config_feeds}
+        user_feed_ids = set(user_feeds_map.keys())
+        
+        # 按 user_settings 顺序，合并配置
+        merged_feeds = []
+        for uf in user_feeds:
+            feed_id = uf['id']
+            # 使用 config 中的完整配置（包含 category 等），覆盖 enabled 状态
+            if feed_id in config_feeds_map:
+                merged_feed = config_feeds_map[feed_id].copy()
+                merged_feed['enabled'] = uf.get('enabled', True)
+                merged_feeds.append(merged_feed)
+            else:
+                merged_feeds.append(uf)
+        
+        # 添加 config 中有但 user_settings 中没有的新源（追加到末尾）
+        for cf in config_feeds:
+            if cf['id'] not in user_feed_ids:
+                merged_feeds.append(cf)
+        
+        user_rss['feeds'] = merged_feeds
+        config['rss'] = user_rss
         
     return config
 
@@ -415,15 +446,17 @@ def get_data_from_db():
     """
     从数据库获取新闻数据，按主题和来源分组
     不依赖 index.html，直接使用 frequency_helper 进行关键词匹配
+    同时读取热榜数据和RSS数据，分别存储在 news 和 rss 字段中
     """
     import sqlite3
     
     # 获取今天的数据库路径
     today = datetime.now().strftime("%Y-%m-%d")
-    db_path = OUTPUT_DIR / "news" / f"{today}.db"
+    news_db_path = OUTPUT_DIR / "news" / f"{today}.db"
+    rss_db_path = OUTPUT_DIR / "rss" / f"{today}.db"
     
-    if not db_path.exists():
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Database not found: {db_path}")
+    if not news_db_path.exists() and not rss_db_path.exists():
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] No database found for today")
         return None, None, None
     
     # 加载频率词配置
@@ -443,129 +476,234 @@ def get_data_from_db():
         platform_names[p['id']] = p['name']
         platform_enabled[p['id']] = p.get('enabled', True)
     
-    try:
-        conn = sqlite3.connect(str(db_path))
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        
-        # 查询所有新闻
-        cursor.execute("""
-            SELECT n.title, n.url, n.rank, n.platform_id, p.name as platform_name,
-                   n.first_crawl_time, n.last_crawl_time
-            FROM news_items n
-            LEFT JOIN platforms p ON n.platform_id = p.id
-            ORDER BY n.platform_id, n.rank
-        """)
-        rows = cursor.fetchall()
-        
-        # 获取最新爬取时间作为更新时间
-        cursor.execute("SELECT MAX(last_crawl_time) as latest FROM news_items")
-        latest_row = cursor.fetchone()
-        update_time = latest_row['latest'] if latest_row and latest_row['latest'] else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        
-        conn.close()
-        
-        # 判断新闻是否为"新增"（first_crawl_time 在最近1小时内）
-        from datetime import timedelta
-        now = datetime.now()
-        one_hour_ago = now - timedelta(hours=1)
-        
-        # 初始化主题数据结构
-        topics = []
-        for i, group in enumerate(word_groups):
-            topics.append({
-                "id": i,
-                "name": group["group_key"],
-                "keywords": group.get("keywords", []),
-                "category": group.get("category", "其他"),
-                "filter": group.get("filter", []),
-                "count": 0,
-                "news": []
-            })
-        
-        # 按来源分组的数据
-        sources_dict = {}
-        
-        # 用于去重（同一新闻可能匹配多个主题）
-        topic_news_seen = {i: set() for i in range(len(topics))}
-        
-        # 处理每条新闻
-        for row in rows:
-            platform_id = row['platform_id']
-            platform_name = platform_names.get(platform_id, row['platform_name'] or platform_id)
-            
-            # 跳过禁用的平台
-            if not platform_enabled.get(platform_id, True):
+    from datetime import timedelta
+    now = datetime.now()
+    one_hour_ago = now - timedelta(hours=1)
+    
+    def parse_crawl_time(time_str):
+        """解析 first_crawl_time，兼容多种格式"""
+        if not time_str:
+            return None
+        for fmt in ["%H:%M", "%H-%M", "%Y-%m-%d %H:%M:%S"]:
+            try:
+                t = datetime.strptime(time_str, fmt)
+                if fmt in ["%H:%M", "%H-%M"]:
+                    t = t.replace(year=now.year, month=now.month, day=now.day)
+                return t
+            except:
                 continue
+        return None
+    
+    # 初始化主题数据结构 - 每个主题有 news 和 rss 两个数组
+    topics = []
+    for i, group in enumerate(word_groups):
+        topics.append({
+            "id": i,
+            "name": group["group_key"],
+            "keywords": group.get("keywords", []),
+            "category": group.get("category", "其他"),
+            "filter": group.get("filter", []),
+            "count": 0,
+            "news": [],      # 热榜新闻
+            "rss": [],       # RSS新闻
+            "newsCount": 0,
+            "rssCount": 0
+        })
+    
+    # 按来源分组的数据
+    sources_dict = {}
+    
+    # 用于去重
+    topic_news_seen = {i: set() for i in range(len(topics))}
+    topic_rss_seen = {i: set() for i in range(len(topics))}
+    
+    update_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # ========== 读取热榜数据 ==========
+    if news_db_path.exists():
+        try:
+            conn = sqlite3.connect(str(news_db_path))
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
             
-            title = row['title']
-            url = row['url']
-            rank = row['rank']
+            cursor.execute("""
+                SELECT n.title, n.url, n.rank, n.platform_id, p.name as platform_name,
+                       n.first_crawl_time, n.last_crawl_time
+                FROM news_items n
+                LEFT JOIN platforms p ON n.platform_id = p.id
+                ORDER BY n.platform_id, n.rank
+            """)
+            rows = cursor.fetchall()
             
-            # 判断是否为新增新闻
-            is_new = False
-            if row['first_crawl_time']:
-                try:
-                    first_time = datetime.strptime(row['first_crawl_time'], "%Y-%m-%d %H:%M:%S")
+            cursor.execute("SELECT MAX(last_crawl_time) as latest FROM news_items")
+            latest_row = cursor.fetchone()
+            if latest_row and latest_row['latest']:
+                update_time = latest_row['latest']
+            
+            conn.close()
+            
+            for row in rows:
+                platform_id = row['platform_id']
+                platform_name = platform_names.get(platform_id, row['platform_name'] or platform_id)
+                
+                if not platform_enabled.get(platform_id, True):
+                    continue
+                
+                title = row['title']
+                url = row['url']
+                rank = row['rank']
+                
+                is_new = False
+                first_time = parse_crawl_time(row['first_crawl_time'])
+                if first_time:
                     is_new = first_time > one_hour_ago
-                except:
-                    pass
+                
+                matched_topics = find_matched_topics(title, word_groups, filter_words, global_filters)
+                
+                news_item = {
+                    "title": title,
+                    "url": url,
+                    "rank": rank,
+                    "source": platform_name,
+                    "isNew": is_new,
+                    "matchedTopics": matched_topics,
+                    "dataType": "news"
+                }
+                
+                for mt in matched_topics:
+                    topic_name = mt["topic"]
+                    for i, topic in enumerate(topics):
+                        if topic["name"] == topic_name:
+                            if title not in topic_news_seen[i]:
+                                topic_news_seen[i].add(title)
+                                topics[i]["news"].append(news_item.copy())
+                            break
+                
+                if matched_topics:
+                    if platform_name not in sources_dict:
+                        sources_dict[platform_name] = {
+                            "id": platform_id,
+                            "name": platform_name,
+                            "order": platform_order.get(platform_id, 999),
+                            "news": [],
+                            "rss": []
+                        }
+                    sources_dict[platform_name]["news"].append(news_item)
             
-            # 使用 frequency_helper 匹配主题
-            matched_topics = find_matched_topics(title, word_groups, filter_words, global_filters)
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] News DB loaded")
+        except Exception as e:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] News DB error: {e}")
+    
+    # ========== 读取 RSS 数据 ==========
+    # 获取 RSS 配置顺序和分类
+    rss_config = config.get('rss', {})
+    rss_feeds_config = rss_config.get('feeds', [])
+    rss_order = {f['id']: i for i, f in enumerate(rss_feeds_config)}
+    rss_enabled = {f['id']: f.get('enabled', True) for f in rss_feeds_config}
+    rss_category = {f['id']: f.get('category', 'tech') for f in rss_feeds_config}
+    
+    if rss_db_path.exists():
+        try:
+            conn = sqlite3.connect(str(rss_db_path))
+            conn.row_factory = sqlite3.Row
+            cursor = conn.cursor()
             
-            news_item = {
-                "title": title,
-                "url": url,
-                "rank": rank,
-                "source": platform_name,
-                "isNew": is_new,
-                "matchedTopics": matched_topics
-            }
+            cursor.execute("""
+                SELECT title, feed_id, url, published_at, summary, author,
+                       first_crawl_time, last_crawl_time
+                FROM rss_items
+                ORDER BY published_at DESC
+            """)
+            rss_rows = cursor.fetchall()
             
-            # 添加到匹配的主题中
-            for mt in matched_topics:
-                topic_name = mt["topic"]
-                # 找到对应的主题索引
-                for i, topic in enumerate(topics):
-                    if topic["name"] == topic_name:
-                        # 去重：同一标题不重复添加到同一主题
-                        if title not in topic_news_seen[i]:
-                            topic_news_seen[i].add(title)
-                            topics[i]["news"].append(news_item.copy())
-                        break
+            # 获取 feed 名称映射
+            cursor.execute("SELECT id, name FROM rss_feeds")
+            feed_names = {row['id']: row['name'] for row in cursor.fetchall()}
             
-            # 添加到来源分组（只要新闻匹配了任意主题就添加）
-            if matched_topics:
-                if platform_name not in sources_dict:
-                    sources_dict[platform_name] = {
-                        "id": platform_id,
-                        "name": platform_name,
-                        "order": platform_order.get(platform_id, 999),
-                        "news": []
-                    }
-                sources_dict[platform_name]["news"].append(news_item)
-        
-        # 更新主题的 count 并按热度排序新闻
-        for topic in topics:
-            # 按 rank 排序
-            topic["news"].sort(key=lambda x: x.get("rank", 999))
-            topic["count"] = len(topic["news"])
-        
-        # 按配置顺序排序来源
-        sources_list = sorted(sources_dict.values(), key=lambda x: x['order'])
-        for s in sources_list:
-            s['count'] = len(s['news'])
+            conn.close()
+            
+            for row in rss_rows:
+                feed_id = row['feed_id']
+                
+                # 检查是否启用
+                if not rss_enabled.get(feed_id, True):
+                    continue
+                
+                feed_name = feed_names.get(feed_id, feed_id)
+                source_name = f"[RSS] {feed_name}"
+                
+                title = row['title']
+                url = row['url']
+                published_at = row['published_at'] or ''
+                
+                is_new = False
+                first_time = parse_crawl_time(row['first_crawl_time'])
+                if first_time:
+                    is_new = first_time > one_hour_ago
+                
+                matched_topics = find_matched_topics(title, word_groups, filter_words, global_filters)
+                
+                rss_item = {
+                    "title": title,
+                    "url": url,
+                    "source": source_name,
+                    "published_at": published_at,
+                    "isNew": is_new,
+                    "matchedTopics": matched_topics,
+                    "dataType": "rss",
+                    "summary": row['summary'] or '',
+                    "author": row['author'] or ''
+                }
+                
+                for mt in matched_topics:
+                    topic_name = mt["topic"]
+                    for i, topic in enumerate(topics):
+                        if topic["name"] == topic_name:
+                            if title not in topic_rss_seen[i]:
+                                topic_rss_seen[i].add(title)
+                                topics[i]["rss"].append(rss_item.copy())
+                            break
+                
+                if matched_topics:
+                    if source_name not in sources_dict:
+                        # 使用配置中的顺序，默认放在最后
+                        feed_order = rss_order.get(feed_id, 999) + 1000
+                        sources_dict[source_name] = {
+                            "id": feed_id,
+                            "name": source_name,
+                            "order": feed_order,
+                            "category": rss_category.get(feed_id, 'tech'),
+                            "news": [],
+                            "rss": []
+                        }
+                    sources_dict[source_name]["rss"].append(rss_item)
+            
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] RSS DB loaded: {len(rss_rows)} items")
+        except Exception as e:
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] RSS DB error: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    # ========== 更新统计和排序 ==========
+    for topic in topics:
+        topic["news"].sort(key=lambda x: x.get("rank", 999))
+        topic["rss"].sort(key=lambda x: x.get("published_at", ""), reverse=True)
+        topic["newsCount"] = len(topic["news"])
+        topic["rssCount"] = len(topic["rss"])
+        topic["count"] = topic["newsCount"] + topic["rssCount"]
+    
+    sources_list = sorted(sources_dict.values(), key=lambda x: x['order'])
+    for s in sources_list:
+        s['newsCount'] = len(s.get('news', []))
+        s['rssCount'] = len(s.get('rss', []))
+        s['count'] = s['newsCount'] + s['rssCount']
+        if 'order' in s:
             del s['order']
-        
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] DB data loaded: {len(topics)} topics, {len(sources_list)} sources, {sum(t['count'] for t in topics)} matched news")
-        return update_time, topics, sources_list
-        
-    except Exception as e:
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] get_data_from_db error: {e}")
-        import traceback
-        traceback.print_exc()
-        return None, None, None
+    
+    news_count = sum(t['newsCount'] for t in topics)
+    rss_count = sum(t['rssCount'] for t in topics)
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] DB data loaded: {len(topics)} topics, {len(sources_list)} sources, {news_count} news, {rss_count} rss")
+    return update_time, topics, sources_list
 
 
 def refresh_cache():
@@ -743,92 +881,219 @@ class APIHandler(SimpleHTTPRequestHandler):
         return {"success": True, "message": "爬虫任务已启动"}
     
     def get_all_news(self):
-        """从数据库获取全部新闻（不过滤关键词），按配置的来源顺序排列"""
+        """从数据库获取全部新闻和RSS（不过滤关键词），按配置的来源顺序排列"""
         import sqlite3
         
-        # 获取今天的数据库路径（新格式：output/news/{date}.db）
+        # 获取今天的数据库路径
         today = datetime.now().strftime("%Y-%m-%d")
-        db_path = OUTPUT_DIR / "news" / f"{today}.db"
+        news_db_path = OUTPUT_DIR / "news" / f"{today}.db"
+        rss_db_path = OUTPUT_DIR / "rss" / f"{today}.db"
         
-        if not db_path.exists():
+        sources_dict = {}
+        
+        # 读取平台配置顺序
+        platform_order = {}
+        config = get_combined_config()
+        platforms_config = config.get('platforms', [])
+        for i, p in enumerate(platforms_config):
+            platform_order[p['id']] = {'order': i, 'name': p['name']}
+        platform_enabled_id = {p['id']: p.get('enabled', True) for p in platforms_config}
+        platform_enabled_name = {p['name']: p.get('enabled', True) for p in platforms_config}
+        
+        # 读取新闻数据库
+        if news_db_path.exists():
+            try:
+                conn = sqlite3.connect(str(news_db_path))
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                
+                cursor.execute("""
+                    SELECT n.title, n.url, n.rank, n.platform_id, p.name as platform_name,
+                           n.first_crawl_time, n.last_crawl_time
+                    FROM news_items n
+                    LEFT JOIN platforms p ON n.platform_id = p.id
+                    ORDER BY n.platform_id, n.rank
+                """)
+                
+                for row in cursor.fetchall():
+                    platform_id = row['platform_id']
+                    platform_name = row['platform_name'] or platform_id
+                    
+                    if platform_id in platform_order:
+                        platform_name = platform_order[platform_id]['name']
+                    
+                    if platform_name not in sources_dict:
+                        sources_dict[platform_name] = {
+                            'id': platform_id,
+                            'name': platform_name,
+                            'order': platform_order.get(platform_id, {}).get('order', 999),
+                            'news': [],
+                            'rss': []
+                        }
+                    
+                    sources_dict[platform_name]['news'].append({
+                        'title': row['title'],
+                        'url': row['url'],
+                        'rank': row['rank'],
+                        'dataType': 'news'
+                    })
+                conn.close()
+            except Exception as e:
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] get_all_news (news db) error: {e}")
+        
+        # 读取 RSS 数据库
+        # 获取 RSS 配置顺序和分类
+        rss_config = config.get('rss', {})
+        rss_feeds_config = rss_config.get('feeds', [])
+        rss_order = {f['id']: i for i, f in enumerate(rss_feeds_config)}
+        rss_enabled = {f['id']: f.get('enabled', True) for f in rss_feeds_config}
+        rss_category = {f['id']: f.get('category', 'tech') for f in rss_feeds_config}
+        
+        if rss_db_path.exists():
+            try:
+                conn = sqlite3.connect(str(rss_db_path))
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                
+                cursor.execute("SELECT id, name FROM rss_feeds")
+                feed_names = {row['id']: row['name'] for row in cursor.fetchall()}
+                
+                cursor.execute("""
+                    SELECT title, url, feed_id, published_at
+                    FROM rss_items
+                    ORDER BY published_at DESC
+                """)
+                
+                for row in cursor.fetchall():
+                    feed_id = row['feed_id']
+                    
+                    # 检查是否启用
+                    if not rss_enabled.get(feed_id, True):
+                        continue
+                    
+                    feed_name = feed_names.get(feed_id, feed_id)
+                    source_name = f"[RSS] {feed_name}"
+                    
+                    if source_name not in sources_dict:
+                        # 使用配置中的顺序
+                        feed_order = rss_order.get(feed_id, 999) + 1000
+                        sources_dict[source_name] = {
+                            'id': feed_id,
+                            'name': source_name,
+                            'order': feed_order,
+                            'category': rss_category.get(feed_id, 'tech'),
+                            'news': [],
+                            'rss': []
+                        }
+                    
+                    sources_dict[source_name]['rss'].append({
+                        'title': row['title'],
+                        'url': row['url'],
+                        'rank': 0,
+                        'published_at': row['published_at'] or '',
+                        'dataType': 'rss'
+                    })
+                conn.close()
+            except Exception as e:
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] get_all_news (rss db) error: {e}")
+        
+        if not sources_dict:
             return {"success": False, "error": "今日数据库不存在", "sources": []}
         
+        # 按配置顺序排序并过滤禁用平台
+        sources_list = [
+            s for s in sorted(sources_dict.values(), key=lambda x: x['order'])
+            if platform_enabled_id.get(s['id'], platform_enabled_name.get(s['name'], True))
+        ]
+        
+        # 添加 count 并移除 order 字段
+        for s in sources_list:
+            s['newsCount'] = len(s['news'])
+            s['rssCount'] = len(s['rss'])
+            s['count'] = s['newsCount'] + s['rssCount']
+            del s['order']
+        
+        news_total = sum(s['newsCount'] for s in sources_list)
+        rss_total = sum(s['rssCount'] for s in sources_list)
+        
+        return {
+            "success": True,
+            "update_time": cache.get("update_time", ""),
+            "sources": sources_list,
+            "total": news_total + rss_total,
+            "newsTotal": news_total,
+            "rssTotal": rss_total
+        }
+    
+    def get_rss_data(self):
+        """从 RSS 数据库获取数据"""
+        import sqlite3
+        
+        today = datetime.now().strftime("%Y-%m-%d")
+        db_path = OUTPUT_DIR / "rss" / f"{today}.db"
+        
+        if not db_path.exists():
+            return {"success": False, "error": "今日 RSS 数据库不存在，请先运行爬虫", "feeds": [], "items": []}
+        
         try:
-            # 读取平台配置顺序
-            platform_order = {}
-            config = get_combined_config()
-            platforms_config = config.get('platforms', [])
-            for i, p in enumerate(platforms_config):
-                platform_order[p['id']] = {'order': i, 'name': p['name']}
-            platform_enabled_id = {p['id']: p.get('enabled', True) for p in platforms_config}
-            platform_enabled_name = {p['name']: p.get('enabled', True) for p in platforms_config}
-            
             conn = sqlite3.connect(str(db_path))
             conn.row_factory = sqlite3.Row
             cursor = conn.cursor()
             
-            # 查询所有新闻，按平台和排名分组
+            # 获取所有 RSS 源
+            cursor.execute("SELECT id, name, item_count, last_fetch_time, last_fetch_status FROM rss_feeds ORDER BY name")
+            feeds_rows = cursor.fetchall()
+            feeds = [dict(row) for row in feeds_rows]
+            
+            # 获取所有 RSS 条目，按发布时间倒序
             cursor.execute("""
-                SELECT n.title, n.url, n.rank, n.platform_id, p.name as platform_name,
-                       n.first_crawl_time, n.last_crawl_time
-                FROM news_items n
-                LEFT JOIN platforms p ON n.platform_id = p.id
-                ORDER BY n.platform_id, n.rank
+                SELECT title, feed_id, url, published_at, summary, author, first_crawl_time, last_crawl_time
+                FROM rss_items
+                ORDER BY published_at DESC, last_crawl_time DESC
+                LIMIT 500
             """)
+            items_rows = cursor.fetchall()
             
-            rows = cursor.fetchall()
-            conn.close()
+            # 构建 feed_id -> name 映射
+            feed_names = {f['id']: f['name'] for f in feeds}
             
-            # 按来源分组
-            sources_dict = {}
-            for row in rows:
-                platform_id = row['platform_id']
-                platform_name = row['platform_name'] or platform_id
-                
-                # 使用配置中的名称（如果有）
-                if platform_id in platform_order:
-                    platform_name = platform_order[platform_id]['name']
-                
-                if platform_name not in sources_dict:
-                    sources_dict[platform_name] = {
-                        'id': platform_id,
-                        'name': platform_name,
-                        'order': platform_order.get(platform_id, {}).get('order', 999),
-                        'news': []
-                    }
-                
-                sources_dict[platform_name]['news'].append({
+            items = []
+            for row in items_rows:
+                items.append({
                     'title': row['title'],
+                    'feed_id': row['feed_id'],
+                    'feed_name': feed_names.get(row['feed_id'], row['feed_id']),
                     'url': row['url'],
-                    'rank': row['rank']
+                    'published_at': row['published_at'] or '',
+                    'summary': row['summary'] or '',
+                    'author': row['author'] or '',
+                    'first_crawl_time': row['first_crawl_time'],
+                    'last_crawl_time': row['last_crawl_time'],
                 })
             
-            # 按配置顺序排序并过滤禁用平台
-            sources_list = [
-                s for s in sorted(sources_dict.values(), key=lambda x: x['order'])
-                if platform_enabled_id.get(s['id'], platform_enabled_name.get(s['name'], True))
-            ]
+            # 获取最后更新时间
+            cursor.execute("SELECT MAX(last_crawl_time) as latest FROM rss_items")
+            latest_row = cursor.fetchone()
+            update_time = latest_row['latest'] if latest_row and latest_row['latest'] else ''
             
-            # 添加 count 并移除 order 字段
-            for s in sources_list:
-                s['count'] = len(s['news'])
-                del s['order']
+            conn.close()
             
             return {
                 "success": True,
-                "update_time": cache.get("update_time", ""),
-                "sources": sources_list,
-                "total": sum(s['count'] for s in sources_list)
+                "update_time": update_time,
+                "feeds": feeds,
+                "items": items,
+                "total": len(items)
             }
             
         except Exception as e:
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] get_all_news error: {e}")
+            print(f"[{datetime.now().strftime('%H:%M:%S')}] get_rss_data error: {e}")
             import traceback
             traceback.print_exc()
-            return {"success": False, "error": str(e), "sources": []}
-    
+            return {"success": False, "error": str(e), "feeds": [], "items": []}
+
     def search_news(self, keyword):
-        """搜索新闻"""
+        """搜索新闻和RSS"""
         import sqlite3
         
         if not keyword or not keyword.strip():
@@ -836,58 +1101,92 @@ class APIHandler(SimpleHTTPRequestHandler):
         
         keyword = keyword.strip()
         
-        # 获取今天的数据库路径（新格式：output/news/{date}.db）
+        # 获取今天的数据库路径
         today = datetime.now().strftime("%Y-%m-%d")
-        db_path = OUTPUT_DIR / "news" / f"{today}.db"
+        news_db_path = OUTPUT_DIR / "news" / f"{today}.db"
+        rss_db_path = OUTPUT_DIR / "rss" / f"{today}.db"
         
-        if not db_path.exists():
-            return {"success": False, "error": "今日数据库不存在", "results": []}
+        results = []
         
-        try:
-            # 读取平台配置
-            platform_names = {}
-            config = get_combined_config()
-            for p in config.get('platforms', []):
-                platform_names[p['id']] = p['name']
-            
-            conn = sqlite3.connect(str(db_path))
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
-            
-            # 搜索标题包含关键词的新闻
-            cursor.execute("""
-                SELECT n.title, n.url, n.rank, n.platform_id, p.name as platform_name
-                FROM news_items n
-                LEFT JOIN platforms p ON n.platform_id = p.id
-                WHERE n.title LIKE ?
-                ORDER BY n.rank
-                LIMIT 200
-            """, (f'%{keyword}%',))
-            
-            rows = cursor.fetchall()
-            conn.close()
-            
-            results = []
-            for row in rows:
-                platform_id = row['platform_id']
-                platform_name = platform_names.get(platform_id, row['platform_name'] or platform_id)
-                results.append({
-                    'title': row['title'],
-                    'url': row['url'],
-                    'rank': row['rank'],
-                    'source': platform_name
-                })
-            
-            return {
-                "success": True,
-                "keyword": keyword,
-                "count": len(results),
-                "results": results
-            }
-            
-        except Exception as e:
-            print(f"[{datetime.now().strftime('%H:%M:%S')}] search_news error: {e}")
-            return {"success": False, "error": str(e), "results": []}
+        # 读取平台配置
+        platform_names = {}
+        config = get_combined_config()
+        for p in config.get('platforms', []):
+            platform_names[p['id']] = p['name']
+        
+        # 搜索新闻数据库
+        if news_db_path.exists():
+            try:
+                conn = sqlite3.connect(str(news_db_path))
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                
+                cursor.execute("""
+                    SELECT n.title, n.url, n.rank, n.platform_id, p.name as platform_name
+                    FROM news_items n
+                    LEFT JOIN platforms p ON n.platform_id = p.id
+                    WHERE n.title LIKE ?
+                    ORDER BY n.rank
+                    LIMIT 200
+                """, (f'%{keyword}%',))
+                
+                for row in cursor.fetchall():
+                    platform_id = row['platform_id']
+                    platform_name = platform_names.get(platform_id, row['platform_name'] or platform_id)
+                    results.append({
+                        'title': row['title'],
+                        'url': row['url'],
+                        'rank': row['rank'],
+                        'source': platform_name,
+                        'dataType': 'news'
+                    })
+                conn.close()
+            except Exception as e:
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] search_news (news db) error: {e}")
+        
+        # 搜索 RSS 数据库
+        if rss_db_path.exists():
+            try:
+                conn = sqlite3.connect(str(rss_db_path))
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                
+                # 获取 feed 名称映射
+                cursor.execute("SELECT id, name FROM rss_feeds")
+                feed_names = {row['id']: row['name'] for row in cursor.fetchall()}
+                
+                cursor.execute("""
+                    SELECT title, url, feed_id, published_at
+                    FROM rss_items
+                    WHERE title LIKE ?
+                    ORDER BY published_at DESC
+                    LIMIT 100
+                """, (f'%{keyword}%',))
+                
+                for row in cursor.fetchall():
+                    feed_name = feed_names.get(row['feed_id'], row['feed_id'])
+                    results.append({
+                        'title': row['title'],
+                        'url': row['url'],
+                        'rank': 0,
+                        'source': f"[RSS] {feed_name}",
+                        'published_at': row['published_at'] or '',
+                        'dataType': 'rss'
+                    })
+                conn.close()
+            except Exception as e:
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] search_news (rss db) error: {e}")
+        
+        if not results:
+            if not news_db_path.exists() and not rss_db_path.exists():
+                return {"success": False, "error": "今日数据库不存在", "results": []}
+        
+        return {
+            "success": True,
+            "keyword": keyword,
+            "count": len(results),
+            "results": results
+        }
     
     def send_json(self, data, status=200):
         self.send_response(status)
@@ -946,11 +1245,21 @@ class APIHandler(SimpleHTTPRequestHandler):
                 self.send_json({"success": False, "error": str(e)}, 500)
         
         elif path == '/api/config/platforms':
-            # 获取平台配置
+            # 获取平台配置（包含 RSS 源）
             try:
                 config = get_combined_config()
                 if config:
                     platforms = config.get('platforms', [])
+                    # 添加 RSS 源
+                    rss_config = config.get('rss', {})
+                    rss_feeds = rss_config.get('feeds', [])
+                    for feed in rss_feeds:
+                        platforms.append({
+                            'id': feed.get('id', ''),
+                            'name': f"[RSS] {feed.get('name', feed.get('id', ''))}",
+                            'enabled': feed.get('enabled', True),
+                            'isRss': True
+                        })
                     self.send_json({"success": True, "platforms": platforms})
                 else:
                     self.send_json({"success": False, "error": "配置文件不存在"}, 404)
@@ -984,6 +1293,10 @@ class APIHandler(SimpleHTTPRequestHandler):
         elif path == '/api/allnews':
             # 获取全部新闻（从数据库读取，不过滤关键词）
             self.send_json(self.get_all_news())
+        
+        elif path == '/api/rss':
+            # 获取 RSS 数据
+            self.send_json(self.get_rss_data())
         
         elif path.startswith('/api/search'):
             # 搜索新闻
@@ -1025,15 +1338,37 @@ class APIHandler(SimpleHTTPRequestHandler):
                 self.send_json({"success": False, "error": str(e)}, 500)
         
         elif path == '/api/config/platforms':
-            # 保存平台配置
+            # 保存平台配置（包含 RSS 源）
             try:
                 data = json.loads(post_data)
                 platforms = normalize_platforms_for_save(data.get('platforms', []))
+                rss_feeds = data.get('rssFeeds', [])
                 
-                if save_user_settings({'platforms': platforms}):
-                    # 刷新缓存以应用新的来源顺序
-                    # 注意：前端可能只发回了选中的平台（取决于前端逻辑）
-                    # 但我们的 get_combined_config 会把缺失的补回来，所以这里保存是安全的
+                settings_to_save = {'platforms': platforms}
+                
+                # 如果有 RSS 源配置，按前端顺序保存
+                if rss_feeds:
+                    config = get_combined_config()
+                    existing_rss = config.get('rss', {})
+                    existing_feeds = existing_rss.get('feeds', [])
+                    
+                    # 创建 id -> 完整配置 映射
+                    existing_feeds_map = {f['id']: f for f in existing_feeds}
+                    
+                    # 按前端传来的顺序重建 feeds 列表
+                    new_feeds = []
+                    for rf in rss_feeds:
+                        feed_id = rf['id']
+                        if feed_id in existing_feeds_map:
+                            # 保留原有配置，只更新 enabled
+                            feed = existing_feeds_map[feed_id].copy()
+                            feed['enabled'] = rf.get('enabled', True)
+                            new_feeds.append(feed)
+                    
+                    existing_rss['feeds'] = new_feeds
+                    settings_to_save['rss'] = existing_rss
+                
+                if save_user_settings(settings_to_save):
                     refresh_cache()
                     self.send_json({"success": True, "message": "保存成功"})
                 else:
