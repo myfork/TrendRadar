@@ -13,8 +13,8 @@
 [![GitHub Stars](https://img.shields.io/github/stars/sansan0/TrendRadar?style=flat-square&logo=github&color=yellow)](https://github.com/sansan0/TrendRadar/stargazers)
 [![GitHub Forks](https://img.shields.io/github/forks/sansan0/TrendRadar?style=flat-square&logo=github&color=blue)](https://github.com/sansan0/TrendRadar/network/members)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg?style=flat-square)](LICENSE)
-[![Version](https://img.shields.io/badge/version-v4.5.0-blue.svg)](https://github.com/sansan0/TrendRadar)
-[![MCP](https://img.shields.io/badge/MCP-v2.0.0-green.svg)](https://github.com/sansan0/TrendRadar)
+[![Version](https://img.shields.io/badge/version-v4.7.0-blue.svg)](https://github.com/sansan0/TrendRadar)
+[![MCP](https://img.shields.io/badge/MCP-v2.0.1-green.svg)](https://github.com/sansan0/TrendRadar)
 [![RSS](https://img.shields.io/badge/RSS-Feed_Support-orange.svg?style=flat-square&logo=rss&logoColor=white)](https://github.com/sansan0/TrendRadar)
 
 [![WeWork](https://img.shields.io/badge/WeWork-Notification-00D4AA?style=flat-square)](https://work.weixin.qq.com/)
@@ -134,6 +134,20 @@ After communication, the author indicated no concerns about server pressure, but
 
 >**📌 Check Latest Updates**: **[Original Repository Changelog](https://github.com/sansan0/TrendRadar?tab=readme-ov-file#-changelog)**:
 - **Tip**: Check [Changelog] to understand specific [Features]
+
+### 2026/01/02 - v4.7.0
+
+- **Fix RSS HTML Display**: Fixed RSS data format mismatch causing rendering issues, now displays correctly grouped by keyword
+- **New Regex Syntax**: Keyword config supports `/pattern/` regex syntax, solves English substring mismatch issues (e.g., `ai` matching `training`) [📖 View Syntax Details](#keyword-basic-syntax)
+- **New Display Name Syntax**: Use `=> alias` to give complex regex a friendly name, cleaner push notifications (e.g., `/\bai\b/ => AI Related`)
+- **Can't Write Regex?** README now includes AI prompt guide - just tell ChatGPT/Claude/DeepSeek what you want to match
+
+
+### 2026/01/01 - v4.6.0
+
+- **Fix RSS HTML Display**: Merged RSS content into trending HTML page, grouped by source
+- **New display_mode Config**: Support `keyword` (group by keyword) and `platform` (group by platform) display modes
+
 
 ### 2025/12/30 - v4.5.0
 
@@ -726,6 +740,7 @@ rss:
 |---------|-------------|---------|
 | **Push Time Window Control** | Set push time range (e.g., 09:00-18:00) to avoid non-work hours notifications | Disabled |
 | **Content Order Configuration** | Adjust display order of "Trending Keywords Stats" and "New Trending News" (v3.5.0 new) | Stats first |
+| **Display Mode Switch** | `keyword`=group by keyword, `platform`=group by platform (v4.6.0 new) | keyword |
 
 > 💡 For detailed configuration, see [Configuration Guide - Report Configuration](#7-report-configuration) and [Configuration Guide - Push Window](#8-push-window-configuration)
 
@@ -733,12 +748,14 @@ rss:
 
 Set personal keywords (e.g., AI, BYD, Education Policy) to receive only relevant trending news, filtering out noise.
 
-**Basic Syntax** (5 types):
+**Basic Syntax** (7 types):
 - Normal words: Basic matching
 - Required words `+`: Narrow scope
 - Filter words `!`: Exclude noise
 - Count limit `@`: Control display count (v3.2.0 new)
 - Global filter `[GLOBAL_FILTER]`: Globally exclude specified content (v3.5.0 new)
+- Regex `/pattern/`: Precise pattern matching (v4.7.0 new)
+- Display name `=> alias`: Custom display text (v4.7.0 new)
 
 **Advanced Features** (v3.2.0 new):
 - 🔢 **Keyword Sorting Control**: Sort by popularity or config order
@@ -1183,6 +1200,7 @@ Method 1 discovered and suggested by **ziventian**, thanks to them. Default is p
 | **189 Mail** | 189.cn | smtp.189.cn | 465 | SSL |
 | **Aliyun Mail** | aliyun.com | smtp.aliyun.com | 465 | TLS |
 | **Yandex Mail** | yandex.com | smtp.yandex.com | 465 | TLS |
+| **iCloud Mail** | icloud.com | smtp.mail.me.com | 587 | SSL |
 
 > **Auto-detect**: When using above emails, no need to manually configure `EMAIL_SMTP_SERVER` and `EMAIL_SMTP_PORT`, system auto-detects.
 >
@@ -1194,6 +1212,7 @@ Method 1 discovered and suggested by **ziventian**, thanks to them. Default is p
 > - Thanks to [@DYZYD](https://github.com/DYZYD) for contributing 189 Mail (189.cn) configuration and completing self-send-receive testing ([#291](https://github.com/sansan0/TrendRadar/issues/291))
 > - Thanks to [@longzhenren](https://github.com/longzhenren) for contributing Aliyun Mail (aliyun.com) configuration and completing testing ([#344](https://github.com/sansan0/TrendRadar/issues/344))
 > - Thanks to [@ACANX](https://github.com/ACANX) for contributing Yandex Mail (yandex.com) configuration and completing testing ([#663](https://github.com/sansan0/TrendRadar/issues/663))
+> - Thanks to [@Sleepy-Tianhao](https://github.com/Sleepy-Tianhao) for contributing iCloud Mail (icloud.com) configuration and completing testing ([#728](https://github.com/sansan0/TrendRadar/issues/728))
 
 **Common Email Settings:**
 
@@ -1690,7 +1709,7 @@ platforms:
 
 **Configuration Location:** `config/frequency_words.txt`
 
-Configure monitoring keywords in `frequency_words.txt` with five syntax types, region markers, and grouping features.
+Configure monitoring keywords in `frequency_words.txt` with seven syntax types, region markers, and grouping features.
 
 | Syntax Type | Symbol | Purpose | Example | Matching Logic |
 |------------|--------|---------|---------|----------------|
@@ -1699,6 +1718,8 @@ Configure monitoring keywords in `frequency_words.txt` with five syntax types, r
 | **Filter** | `!` | Noise exclusion | `!ad` | Exclude if included |
 | **Count Limit** | `@` | Control display count | `@10` | Max 10 news (v3.2.0 new) |
 | **Global Filter** | `[GLOBAL_FILTER]` | Globally exclude content | See example below | Filter under any circumstances (v3.5.0 new) |
+| **Regex** | `/pattern/` | Precise matching | `/\bai\b/` | Match using regex (v4.7.0 new) |
+| **Display Name** | `=> alias` | Custom display text | `/\bai\b/ => AI Related` | Show alias in push/HTML (v4.7.0 new) |
 
 #### 2.1 Basic Syntax
 
@@ -1791,6 +1812,105 @@ AI
 - Use global filter words carefully to avoid over-filtering and missing valuable content
 - Recommended to keep global filter words under 5-15
 - For group-specific filtering, prioritize using group filter words (`!` prefix)
+
+##### 6. **Regex** `/pattern/` - Precise Matching (v4.7.0 new)
+
+Normal keywords use substring matching, which is convenient for Chinese but may cause false matches in English. For example, `ai` would match the `ai` in `training`.
+
+Use regex syntax `/pattern/` to achieve precise matching:
+
+```txt
+/(?<![a-z])ai(?![a-z])/
+artificial intelligence
+```
+
+**Effect:** Match using regular expressions, supports all Python regex syntax
+
+**Common Regex Patterns:**
+
+| Need | Regex | Description |
+|------|-------|-------------|
+| Word boundary | `/\bword\b/` | Match standalone word, e.g., `/\bai\b/` matches "AI" but not "training" |
+| Non-letter boundary | `/(?<![a-z])ai(?![a-z])/` | Looser boundary, suitable for mixed Chinese-English |
+| Start match | `/^breaking/` | Only match titles starting with "breaking" |
+| End match | `/release$/` | Only match titles ending with "release" |
+| Multiple options | `/apple\|huawei\|xiaomi/` | Match any one (note escaped `\|`) |
+
+**Matching Examples:**
+```txt
+# Config
+/(?<![a-z])ai(?![a-z])/
+artificial intelligence
+```
+
+- ✅ "AI is the future" ← Matches standalone "AI"
+- ✅ "Hello ai here" ← Non-letter boundaries, matches "ai"
+- ✅ "Artificial intelligence grows rapidly" ← Matches "artificial intelligence"
+- ❌ "Resistance training is important" ← "ai" in "training" doesn't match
+- ❌ "The maid cleaned the room" ← "ai" in "maid" doesn't match
+
+**Combined Usage:**
+```txt
+# Regex + Normal + Filter
+/\bai\b/
+artificial intelligence
+machine learning
+!advertisement
+```
+
+**Notes:**
+- Regex automatically enables case-insensitive matching (`re.IGNORECASE`)
+- Supports JavaScript-style `/pattern/i` syntax (flags are ignored since case-insensitive is always enabled)
+- Invalid regex syntax will be treated as normal words
+- Regex can be used for normal words, required words(`+`), and filter words(`!`)
+
+**💡 Can't Write Regex? Let AI Help!**
+
+If you're not familiar with regular expressions, just ask ChatGPT / Claude / DeepSeek to generate one:
+
+> I need a Python regex to match the word "ai" but not match "ai" in "training".
+> Please give me the regex in `/pattern/` format without extra explanation.
+
+AI will give you something like: `/(?<![a-zA-Z])ai(?![a-zA-Z])/`
+
+##### 7. **Display Name** `=> alias` - Custom Display Text (v4.7.0 new)
+
+Regex patterns can look unfriendly in push notifications and HTML pages. Use `=> alias` syntax to set a display name:
+
+```txt
+/(?<![a-zA-Z])ai(?![a-zA-Z])/ => AI Related
+artificial intelligence
+```
+
+**Effect:** Push notifications and HTML pages show "AI Related" instead of the complex regex
+
+**Syntax Format:**
+```txt
+# Regex + Display Name
+/pattern/ => Display Name
+/pattern/i => Display Name    # Supports flags syntax (flags are ignored)
+/pattern/=>Display Name       # Spaces around => are optional
+
+# Normal Word + Display Name
+deepseek => DeepSeek News
+```
+
+**Example:**
+```txt
+# Config
+/(?<![a-zA-Z])ai(?![a-zA-Z])/ => AI Related
+artificial intelligence
+```
+
+| Original Config | Push/HTML Display |
+|----------------|-------------------|
+| `/(?<![a-z])ai(?![a-z])/` + `artificial intelligence` | `(?<![a-z])ai(?![a-z]) artificial intelligence` |
+| `/(?<![a-z])ai(?![a-z])/ => AI Related` + `artificial intelligence` | **`AI Related`** |
+
+**Notes:**
+- Display name only needs to be set on the first word of a group
+- If multiple words have display names, the first one is used
+- Without display name, all words in the group are concatenated
 
 ---
 
@@ -2559,6 +2679,7 @@ After MCP service starts, configure based on your client:
 ```yaml
 report:
   mode: "daily"                    # Push mode
+  display_mode: "keyword"          # Display mode (v4.6.0 new)
   rank_threshold: 5                # Ranking highlight threshold
   sort_by_position_first: false    # Sorting priority
   max_news_per_keyword: 0          # Maximum display count per keyword
@@ -2570,10 +2691,41 @@ report:
 | Config Item | Type | Default | Description |
 |------------|------|---------|-------------|
 | `mode` | string | `daily` | Push mode, options: `daily`/`incremental`/`current`, see [Push Mode Details](#3-push-mode-details) |
+| `display_mode` | string | `keyword` | Display mode, options: `keyword`/`platform`, see below |
 | `rank_threshold` | int | `5` | Ranking highlight threshold, news with rank ≤ this value will be displayed in bold |
 | `sort_by_position_first` | bool | `false` | Sorting priority: `false`=sort by news count, `true`=sort by config position |
 | `max_news_per_keyword` | int | `0` | Maximum display count per keyword, `0`=unlimited |
 | `reverse_content_order` | bool | `false` | Content order: `false`=trending keywords stats first, `true`=new trending news first |
+
+#### Display Mode Configuration (v4.6.0 New)
+
+Controls how news is grouped in push messages and HTML reports:
+
+| Mode | Grouping | Title Prefix | Use Case |
+|------|----------|--------------|----------|
+| `keyword` (default) | Group by keyword | `[Platform]` | Users focusing on specific topics |
+| `platform` | Group by platform | `[Keyword]` | Users focusing on specific platforms |
+
+**Example Comparison:**
+
+```
+# keyword mode (group by keyword)
+📊 Trending Keywords Stats
+🔥 [1/3] AI : 12 items
+  1. [Weibo] OpenAI releases GPT-5 #1-#3 - 08:30 (5 times)
+  2. [Zhihu] How to view AI replacing programmers #2 - 09:15 (3 times)
+
+# platform mode (group by platform)
+📊 Trending News Stats
+🔥 [1/4] Weibo : 12 items
+  1. [AI] OpenAI releases GPT-5 #1-#3 - 08:30 (5 times)
+  2. [Trump] Trump announces major policy #2 - 09:15 (3 times)
+```
+
+**Docker Environment Variable:**
+```bash
+DISPLAY_MODE=platform
+```
 
 #### Content Order Configuration (v3.5.0 New)
 

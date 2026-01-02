@@ -13,8 +13,8 @@
 [![GitHub Stars](https://img.shields.io/github/stars/sansan0/TrendRadar?style=flat-square&logo=github&color=yellow)](https://github.com/sansan0/TrendRadar/stargazers)
 [![GitHub Forks](https://img.shields.io/github/forks/sansan0/TrendRadar?style=flat-square&logo=github&color=blue)](https://github.com/sansan0/TrendRadar/network/members)
 [![License](https://img.shields.io/badge/license-GPL--3.0-blue.svg?style=flat-square)](LICENSE)
-[![Version](https://img.shields.io/badge/version-v4.5.0-blue.svg)](https://github.com/sansan0/TrendRadar)
-[![MCP](https://img.shields.io/badge/MCP-v2.0.0-green.svg)](https://github.com/sansan0/TrendRadar)
+[![Version](https://img.shields.io/badge/version-v4.7.0-blue.svg)](https://github.com/sansan0/TrendRadar)
+[![MCP](https://img.shields.io/badge/MCP-v2.0.1-green.svg)](https://github.com/sansan0/TrendRadar)
 [![RSS](https://img.shields.io/badge/RSS-订阅源支持-orange.svg?style=flat-square&logo=rss&logoColor=white)](https://github.com/sansan0/TrendRadar)
 
 [![企业微信通知](https://img.shields.io/badge/企业微信-通知-00D4AA?style=flat-square)](https://work.weixin.qq.com/)
@@ -183,6 +183,19 @@
 
 > **📌 查看最新更新**：**[原仓库更新日志](https://github.com/sansan0/TrendRadar?tab=readme-ov-file#-更新日志)** ：
 - **提示**：建议查看【历史更新】，明确具体的【功能内容】
+
+### 2026/01/02 - v4.7.0
+
+- **修复 RSS HTML 显示**：修复 RSS 数据格式不匹配导致的渲染问题，现在按关键词分组正确显示
+- **新增正则表达式语法**：关键词配置支持 `/pattern/` 正则语法，解决英文子字符串误匹配问题（如 `ai` 匹配 `training`）[📖 查看语法详解](#关键词基础语法)
+- **新增显示名称语法**：使用 `=> 备注` 给复杂的正则表达式起个好记的名字，推送消息显示更清晰（如 `/\bai\b/ => AI相关`）
+- **不会写正则？** README 新增 AI 生成正则的引导，告诉 ChatGPT/Claude/DeepSeek 你想匹配什么，让 AI 帮你写
+
+
+### 2026/01/01 - v4.6.0
+
+- **修复 RSS HTML 显示**：将 RSS 内容合并到热榜 HTML 页面，按源分组显示
+- **新增 display_mode 配置**：支持 `keyword`（按关键词分组）和 `platform`（按平台分组）两种显示模式
 
 
 ### 2025/12/30 - v4.5.0
@@ -764,6 +777,7 @@ rss:
 |------|------|------|
 | **推送时间窗口控制** | 设定推送时间范围（如 09:00-18:00），避免非工作时间打扰 | 关闭 |
 | **内容顺序配置** | 调整"热点词汇统计"和"新增热点新闻"的显示顺序（v3.5.0 新增） | 统计在前 |
+| **显示模式切换** | `keyword`=按关键词分组，`platform`=按平台分组（v4.6.0 新增） | keyword |
 
 > 💡 详细配置教程见 [配置详解 - 报告配置](#7-报告配置) 和 [配置详解 - 推送时间窗口](#8-推送时间窗口配置)
 
@@ -771,12 +785,14 @@ rss:
 
 设置个人关键词（如：AI、比亚迪、教育政策），只推送相关热点，过滤无关信息
 
-**基础语法**（5种）：
+**基础语法**（7种）：
 - 普通词：基础匹配
 - 必须词 `+`：限定范围
 - 过滤词 `!`：排除干扰
 - 数量限制 `@`：控制显示数量（v3.2.0 新增）
 - 全局过滤 `[GLOBAL_FILTER]`：全局排除指定内容（v3.5.0 新增）
+- 正则表达式 `/pattern/`：精确匹配模式（v4.7.0 新增）
+- 显示名称 `=> 备注`：自定义显示文本（v4.7.0 新增）
 
 **高级功能**（v3.2.0 新增）：
 - 🔢 **关键词排序控制**：按热度优先 or 配置顺序优先
@@ -1228,6 +1244,7 @@ GitHub 一键 Fork 即可使用，无需编程基础。
    | **天翼邮箱** | 189.cn | smtp.189.cn | 465 | SSL |
    | **阿里云邮箱** | aliyun.com | smtp.aliyun.com | 465 | TLS |
    | **Yandex邮箱** | yandex.com | smtp.yandex.com | 465 | TLS |
+   | **iCloud邮箱** | icloud.com | smtp.mail.me.com | 587 | SSL |
 
    > **自动识别**：使用以上邮箱时，无需手动配置 `EMAIL_SMTP_SERVER` 和 `EMAIL_SMTP_PORT`，系统会自动识别。
    >
@@ -1239,6 +1256,7 @@ GitHub 一键 Fork 即可使用，无需编程基础。
    > - 感谢 [@DYZYD](https://github.com/DYZYD) 贡献天翼邮箱（189.cn）配置并完成自发自收测试 ([#291](https://github.com/sansan0/TrendRadar/issues/291))
    > - 感谢 [@longzhenren](https://github.com/longzhenren) 贡献阿里云邮箱（aliyun.com）配置并完成测试 ([#344](https://github.com/sansan0/TrendRadar/issues/344))
    > - 感谢 [@ACANX](https://github.com/ACANX) 贡献 Yandex 邮箱（yandex.com）配置并完成测试 ([#663](https://github.com/sansan0/TrendRadar/issues/663))
+   > - 感谢 [@Sleepy-Tianhao](https://github.com/Sleepy-Tianhao) 贡献 iCloud 邮箱（icloud.com）配置并完成测试 ([#728](https://github.com/sansan0/TrendRadar/issues/728))
 
    **常见邮箱设置：**
 
@@ -1744,7 +1762,7 @@ platforms:
 
 ### 2. 关键词配置
 
-在 `frequency_words.txt` 文件中配置监控的关键词，支持五种语法、区域标记和词组功能。
+在 `frequency_words.txt` 文件中配置监控的关键词，支持七种语法、区域标记和词组功能。
 
 | 语法类型 | 符号 | 作用 | 示例 | 匹配逻辑 |
 |---------|------|------|------|---------|
@@ -1753,6 +1771,8 @@ platforms:
 | **过滤词** | `!` | 排除干扰 | `!广告` | 包含则直接排除 |
 | **数量限制** | `@` | 控制显示数量 | `@10` | 最多显示10条新闻（v3.2.0新增） |
 | **全局过滤** | `[GLOBAL_FILTER]` | 全局排除指定内容 | 见下方示例 | 任何情况下都过滤（v3.5.0新增） |
+| **正则表达式** | `/pattern/` | 精确匹配模式 | `/\bai\b/` | 使用正则表达式匹配（v4.7.0新增） |
+| **显示名称** | `=> 备注` | 自定义显示文本 | `/\bai\b/ => AI相关` | 推送和HTML显示备注名称（v4.7.0新增） |
 
 #### 2.1 基础语法
 
@@ -1847,6 +1867,105 @@ AI
 - 全局过滤词应谨慎使用，避免过度过滤导致遗漏有价值内容
 - 建议全局过滤词控制在 5-15 个以内
 - 对于特定词组的过滤，优先使用词组内过滤词（`!` 前缀）
+
+##### 6. **正则表达式** `/pattern/` - 精确匹配模式（v4.7.0 新增）
+
+普通关键词使用子字符串匹配，这在中文环境下很方便，但在英文环境可能会产生误匹配。例如 `ai` 会匹配到 `training` 中的 `ai`。
+
+使用正则表达式语法 `/pattern/` 可以实现精确匹配：
+
+```txt
+/(?<![a-z])ai(?![a-z])/
+人工智能
+```
+
+**作用：** 使用正则表达式进行匹配，支持所有 Python 正则语法
+
+**常用正则模式：**
+
+| 需求 | 正则写法 | 说明 |
+|------|---------|------|
+| 英文单词边界 | `/\bword\b/` | 匹配独立单词，如 `/\bai\b/` 匹配 "AI" 但不匹配 "training" |
+| 前后非字母 | `/(?<![a-z])ai(?![a-z])/` | 更宽松的边界，适合中英混合场景 |
+| 开头匹配 | `/^breaking/` | 只匹配以 "breaking" 开头的标题 |
+| 结尾匹配 | `/发布$/` | 只匹配以 "发布" 结尾的标题 |
+| 多选一 | `/苹果\|华为\|小米/` | 匹配其中任意一个（注意转义 `\|`） |
+
+**匹配示例：**
+```txt
+# 配置
+/(?<![a-z])ai(?![a-z])/
+人工智能
+```
+
+- ✅ "AI is the future" ← 匹配独立的 "AI"
+- ✅ "你好ai这里" ← 前后是中文，匹配 "ai"
+- ✅ "人工智能发展迅速" ← 匹配 "人工智能"
+- ❌ "Resistance training is important" ← "training" 中的 "ai" 不匹配
+- ❌ "The maid cleaned the room" ← "maid" 中的 "ai" 不匹配
+
+**组合使用：**
+```txt
+# 正则 + 普通词 + 过滤词
+/\bai\b/
+人工智能
+机器学习
+!广告
+```
+
+**注意事项：**
+- 正则表达式自动启用大小写不敏感匹配（`re.IGNORECASE`）
+- 支持 `/pattern/i` 等 JavaScript 风格写法（flags 会被忽略，因为默认已启用忽略大小写）
+- 无效的正则语法会被当作普通词处理
+- 正则可用于普通词、必须词(`+`)、过滤词(`!`)
+
+**💡 不会写正则？让 AI 帮你生成！**
+
+如果你不熟悉正则表达式，可以直接让 ChatGPT / Claude / DeepSeek 帮你生成。只需告诉 AI：
+
+> 我需要一个 Python 正则表达式，用于匹配英文单词 "ai"，但不匹配 "training" 中的 "ai"。
+> 请直接给出正则表达式，格式为 `/pattern/`，不需要额外解释。
+
+AI 会给你类似这样的结果：`/(?<![a-zA-Z])ai(?![a-zA-Z])/`
+
+##### 7. **显示名称** `=> 备注` - 自定义显示文本（v4.7.0 新增）
+
+正则表达式在推送消息和 HTML 页面显示时可能不太友好。使用 `=> 备注` 语法可以设置显示名称：
+
+```txt
+/(?<![a-zA-Z])ai(?![a-zA-Z])/ => AI 相关
+人工智能
+```
+
+**作用：** 推送消息和 HTML 页面显示 "AI 相关" 而不是复杂的正则表达式
+
+**语法格式：**
+```txt
+# 正则 + 显示名称
+/pattern/ => 显示名称
+/pattern/i => 显示名称    # 支持 flags 写法（flags 被忽略）
+/pattern/=>显示名称       # => 两边空格可选
+
+# 普通词 + 显示名称
+deepseek => DeepSeek 动态
+```
+
+**匹配示例：**
+```txt
+# 配置
+/(?<![a-zA-Z])ai(?![a-zA-Z])/ => AI 相关
+人工智能
+```
+
+| 原始配置 | 推送/HTML 显示 |
+|---------|---------------|
+| `/(?<![a-z])ai(?![a-z])/` + `人工智能` | `(?<![a-z])ai(?![a-z]) 人工智能` |
+| `/(?<![a-z])ai(?![a-z])/ => AI 相关` + `人工智能` | **`AI 相关`** |
+
+**注意事项：**
+- 显示名称只需写在词组的第一个词上
+- 如果词组中多个词都有显示名称，使用第一个
+- 不设置显示名称时，自动使用词组内所有词拼接
 
 ---
 
@@ -2255,31 +2374,33 @@ TrendRadar 提供两个独立的 Docker 镜像，可根据需求选择部署：
 ```
 
 2. **配置文件说明**:
-   - `config/config.yaml` - 应用主配置（报告模式、推送设置等）
-   - `config/frequency_words.txt` - 关键词配置（设置你关心的热点词汇）
-   - `.env` - 环境变量配置（webhook URLs 和定时任务）
+
+   **配置分工原则（v4.6.0 优化）**：
+   - `config/config.yaml` - **功能配置**（报告模式、推送设置、存储格式、推送窗口等）
+   - `config/frequency_words.txt` - **关键词配置**（设置你关心的热点词汇）
+   - `docker/.env` - **敏感信息 + Docker 特有配置**（webhook URLs、S3 密钥、定时任务）
+
+   > 💡 **配置修改生效**：修改 `config.yaml` 后，执行 `docker compose up -d` 重启容器即可生效
 
    **⚙️ 环境变量覆盖机制（v3.0.5+）**
 
-   如果你在 NAS 或其他 Docker 环境中遇到**修改 `config.yaml` 后配置不生效**的问题，可以通过环境变量直接覆盖配置：
+   `.env` 文件中的环境变量会覆盖 `config.yaml` 中的对应配置：
 
    | 环境变量 | 对应配置 | 示例值 | 说明 |
    |---------|---------|-------|------|
    | `ENABLE_CRAWLER` | `advanced.crawler.enabled` | `true` / `false` | 是否启用爬虫 |
    | `ENABLE_NOTIFICATION` | `notification.enabled` | `true` / `false` | 是否启用通知 |
    | `REPORT_MODE` | `report.mode` | `daily` / `incremental` / `current`| 报告模式 |
-   | `MAX_ACCOUNTS_PER_CHANNEL` | `advanced.max_accounts_per_channel` | `3` | 每个渠道最大账号数 |
-   | `PUSH_WINDOW_ENABLED` | `notification.push_window.enabled` | `true` / `false` | 推送时间窗口开关 |
-   | `PUSH_WINDOW_START` | `notification.push_window.start` | `08:00` | 推送开始时间 |
-   | `PUSH_WINDOW_END` | `notification.push_window.end` | `22:00` | 推送结束时间 |
+   | `DISPLAY_MODE` | `report.display_mode` | `keyword` / `platform` | 显示模式 |
    | `ENABLE_WEBSERVER` | - | `true` / `false` | 是否自动启动 Web 服务器 |
-   | `WEBSERVER_PORT` | - | `8080` | Web 服务器端口（默认 8080） |
-   | `FEISHU_WEBHOOK_URL` | `notification.channels.feishu.webhook_url` | `https://...` | 飞书 Webhook（支持多账号，用 `;` 分隔） |
+   | `WEBSERVER_PORT` | - | `8080` | Web 服务器端口 |
+   | `FEISHU_WEBHOOK_URL` | `notification.channels.feishu.webhook_url` | `https://...` | 飞书 Webhook（多账号用 `;` 分隔） |
+   | `S3_*` | `storage.remote.*` | - | 远程存储配置（5 个参数） |
 
    **配置优先级**：环境变量 > config.yaml
 
    **使用方法**：
-   - 修改 `.env` 文件，取消注释并填写需要的配置
+   - 修改 `.env` 文件，填写需要的配置
    - 或在 NAS/群晖 Docker 管理界面的"环境变量"中直接添加
    - 重启容器后生效：`docker compose up -d`
 
@@ -2597,6 +2718,7 @@ MCP 服务启动后，根据不同客户端进行配置：
 ```yaml
 report:
   mode: "daily"                    # 推送模式
+  display_mode: "keyword"          # 显示模式（v4.6.0 新增）
   rank_threshold: 5                # 排名高亮阈值
   sort_by_position_first: false    # 排序优先级
   max_news_per_keyword: 0          # 每个关键词最大显示数量
@@ -2608,10 +2730,41 @@ report:
 | 配置项 | 类型 | 默认值 | 说明 |
 |-------|------|-------|------|
 | `mode` | string | `daily` | 推送模式，可选 `daily`/`incremental`/`current`，详见 [推送模式详解](#3-推送模式详解) |
+| `display_mode` | string | `keyword` | 显示模式，可选 `keyword`/`platform`，详见下方说明 |
 | `rank_threshold` | int | `5` | 排名高亮阈值，排名 ≤ 该值的新闻会加粗显示 |
 | `sort_by_position_first` | bool | `false` | 排序优先级：`false`=按热点条数排序，`true`=按配置位置排序 |
 | `max_news_per_keyword` | int | `0` | 每个关键词最大显示数量，`0`=不限制 |
 | `reverse_content_order` | bool | `false` | 内容顺序：`false`=热点词汇统计在前，`true`=新增热点新闻在前 |
+
+#### 显示模式配置（v4.6.0 新增）
+
+控制推送消息和 HTML 报告中新闻的分组方式：
+
+| 模式 | 分组方式 | 标题前缀 | 适用场景 |
+|------|---------|---------|---------|
+| `keyword`（默认） | 按关键词分组 | `[平台名]` | 关注特定话题的用户 |
+| `platform` | 按平台分组 | `[关键词]` | 关注特定平台的用户 |
+
+**示例对比：**
+
+```
+# keyword 模式（按关键词分组）
+📊 热点词汇统计
+🔥 [1/3] AI : 12 条
+  1. [微博] OpenAI发布GPT-5 #1-#3 - 08:30 (5次)
+  2. [知乎] 如何看待AI取代程序员 #2 - 09:15 (3次)
+
+# platform 模式（按平台分组）
+📊 热点新闻统计
+🔥 [1/4] 微博 : 12 条
+  1. [AI] OpenAI发布GPT-5 #1-#3 - 08:30 (5次)
+  2. [特朗普] 特朗普宣布重大政策 #2 - 09:15 (3次)
+```
+
+**Docker 环境变量：**
+```bash
+DISPLAY_MODE=platform
+```
 
 #### 内容顺序配置（v3.5.0 新增）
 

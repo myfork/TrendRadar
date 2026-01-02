@@ -10,7 +10,7 @@
 
 from typing import Dict, List, Tuple, Optional, Callable
 
-from trendradar.core.frequency import matches_word_groups
+from trendradar.core.frequency import matches_word_groups, _word_matches
 
 
 def calculate_news_weight(
@@ -262,19 +262,19 @@ def count_word_frequency(
                     if source_id not in word_stats[group_key]["titles"]:
                         word_stats[group_key]["titles"][source_id] = []
                 else:
-                    # 原有的匹配逻辑
+                    # 原有的匹配逻辑（支持正则语法）
                     if required_words:
                         all_required_present = all(
-                            req_word.lower() in title_lower
-                            for req_word in required_words
+                            _word_matches(req_item, title_lower)
+                            for req_item in required_words
                         )
                         if not all_required_present:
                             continue
 
                     if normal_words:
                         any_normal_present = any(
-                            normal_word.lower() in title_lower
-                            for normal_word in normal_words
+                            _word_matches(normal_item, title_lower)
+                            for normal_item in normal_words
                         )
                         if not any_normal_present:
                             continue
@@ -415,12 +415,15 @@ def count_word_frequency(
                 )
 
     stats = []
-    # 创建 group_key 到位置和最大数量的映射
+    # 创建 group_key 到位置、最大数量、显示名称的映射
     group_key_to_position = {
         group["group_key"]: idx for idx, group in enumerate(word_groups)
     }
     group_key_to_max_count = {
         group["group_key"]: group.get("max_count", 0) for group in word_groups
+    }
+    group_key_to_display_name = {
+        group["group_key"]: group.get("display_name") for group in word_groups
     }
 
     for group_key, data in word_stats.items():
@@ -447,9 +450,12 @@ def count_word_frequency(
         if group_max_count > 0:
             sorted_titles = sorted_titles[:group_max_count]
 
+        # 优先使用 display_name，否则使用 group_key
+        display_word = group_key_to_display_name.get(group_key) or group_key
+
         stats.append(
             {
-                "word": group_key,
+                "word": display_word,
                 "count": data["count"],
                 "position": group_key_to_position.get(group_key, 999),
                 "titles": sorted_titles,
@@ -596,20 +602,20 @@ def count_rss_frequency(
             if len(word_groups) == 1 and word_groups[0]["group_key"] == "全部 RSS":
                 matched = True
             else:
-                # 检查必须词
+                # 检查必须词（支持正则语法）
                 if required_words:
                     all_required_present = all(
-                        req_word.lower() in title_lower
-                        for req_word in required_words
+                        _word_matches(req_item, title_lower)
+                        for req_item in required_words
                     )
                     if not all_required_present:
                         continue
 
-                # 检查普通词
+                # 检查普通词（支持正则语法）
                 if normal_words:
                     any_normal_present = any(
-                        normal_word.lower() in title_lower
-                        for normal_word in normal_words
+                        _word_matches(normal_item, title_lower)
+                        for normal_item in normal_words
                     )
                     if not any_normal_present:
                         continue
@@ -651,6 +657,9 @@ def count_rss_frequency(
     group_key_to_max_count = {
         group["group_key"]: group.get("max_count", 0) for group in word_groups
     }
+    group_key_to_display_name = {
+        group["group_key"]: group.get("display_name") for group in word_groups
+    }
 
     for group_key, data in word_stats.items():
         if data["count"] == 0:
@@ -669,8 +678,11 @@ def count_rss_frequency(
         if group_max_count > 0:
             sorted_titles = sorted_titles[:group_max_count]
 
+        # 优先使用 display_name，否则使用 group_key
+        display_word = group_key_to_display_name.get(group_key) or group_key
+
         stats.append({
-            "word": group_key,
+            "word": display_word,
             "count": data["count"],
             "position": group_key_to_position.get(group_key, 999),
             "titles": sorted_titles,
@@ -688,3 +700,73 @@ def count_rss_frequency(
         print(f"[RSS] 关键词分组统计：{matched_count}/{total_items} 条匹配")
 
     return stats, total_items
+
+
+def convert_keyword_stats_to_platform_stats(
+    keyword_stats: List[Dict],
+    weight_config: Dict,
+    rank_threshold: int = 5,
+) -> List[Dict]:
+    """
+    将按关键词分组的统计数据转换为按平台分组的统计数据
+
+    Args:
+        keyword_stats: 原始按关键词分组的统计数据
+        weight_config: 权重配置
+        rank_threshold: 排名阈值
+
+    Returns:
+        按平台分组的统计数据，格式与原 stats 一致
+    """
+    # 1. 收集所有新闻，按平台分组
+    platform_map: Dict[str, List[Dict]] = {}
+
+    for stat in keyword_stats:
+        keyword = stat["word"]
+        for title_data in stat["titles"]:
+            source_name = title_data["source_name"]
+
+            if source_name not in platform_map:
+                platform_map[source_name] = []
+
+            # 复制 title_data 并添加匹配的关键词
+            title_with_keyword = title_data.copy()
+            title_with_keyword["matched_keyword"] = keyword
+            platform_map[source_name].append(title_with_keyword)
+
+    # 2. 去重（同一平台下相同标题只保留一条，保留第一个匹配的关键词）
+    for source_name, titles in platform_map.items():
+        seen_titles: Dict[str, bool] = {}
+        unique_titles = []
+        for title_data in titles:
+            title_text = title_data["title"]
+            if title_text not in seen_titles:
+                seen_titles[title_text] = True
+                unique_titles.append(title_data)
+        platform_map[source_name] = unique_titles
+
+    # 3. 按权重排序每个平台内的新闻
+    for source_name, titles in platform_map.items():
+        platform_map[source_name] = sorted(
+            titles,
+            key=lambda x: (
+                -calculate_news_weight(x, rank_threshold, weight_config),
+                min(x["ranks"]) if x["ranks"] else 999,
+                -x["count"],
+            ),
+        )
+
+    # 4. 构建平台统计结果
+    platform_stats = []
+    for source_name, titles in platform_map.items():
+        platform_stats.append({
+            "word": source_name,  # 平台名作为分组标识
+            "count": len(titles),
+            "titles": titles,
+            "percentage": 0,  # 可后续计算
+        })
+
+    # 5. 按新闻条数排序平台
+    platform_stats.sort(key=lambda x: -x["count"])
+
+    return platform_stats
