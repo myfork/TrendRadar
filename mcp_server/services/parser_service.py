@@ -389,6 +389,11 @@ class ParserService:
         Raises:
             FileParseError: 文件解析错误
         """
+        # [Fork扩展] 使用扩展解析器，支持 #名称 @分类 等完整语法
+        from .parser_service_helper import parse_frequency_words_extended
+        return parse_frequency_words_extended(words_file, self.project_root)
+
+        # --- 以下为原代码（保留作为参考，不会执行）---
         from trendradar.core.frequency import load_frequency_words
 
         if words_file is None:
