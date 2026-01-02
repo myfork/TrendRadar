@@ -38,15 +38,13 @@ from http.server import HTTPServer, SimpleHTTPRequestHandler
 from pathlib import Path
 from urllib.parse import urlparse
 
-# 导入后端的频率词加载函数
-import sys as _sys
-_sys.path.insert(0, '/app')
+# 导入频率词扩展模块（支持 #主题 @分类 语法 + 上游正则语法）
 try:
-    from trendradar.core.frequency import load_frequency_words
+    from frequency_helper import load_frequency_words_extended, find_matched_topics
     FREQUENCY_WORDS_AVAILABLE = True
 except ImportError as e:
     FREQUENCY_WORDS_AVAILABLE = False
-    print(f"Warning: trendradar.core.frequency not available ({e}), topic matching disabled")
+    print(f"Warning: frequency_helper not available ({e}), topic matching disabled")
 
 # 配置
 API_PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8081
@@ -93,12 +91,12 @@ def load_frequency_config():
     try:
         current_mtime = freq_file.stat().st_mtime
         if current_mtime > frequency_cache["last_modified"]:
-            word_groups, filter_words, global_filters = load_frequency_words(str(freq_file))
+            word_groups, filter_words, global_filters = load_frequency_words_extended(str(freq_file))
             frequency_cache["word_groups"] = word_groups
             frequency_cache["filter_words"] = filter_words
             frequency_cache["global_filters"] = global_filters
             frequency_cache["last_modified"] = current_mtime
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] Loaded {len(word_groups)} word groups from frequency_words.txt")
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Loaded {len(frequency_cache['word_groups'])} word groups from frequency_words.txt")
     except Exception as e:
         print(f"[{datetime.now().strftime('%H:%M:%S')}] Error loading frequency words: {e}")
         import traceback
@@ -281,61 +279,6 @@ def get_combined_config():
     return config
 
 
-def find_matched_topics(title: str, word_groups: list, filter_words: list, global_filters: list) -> list:
-    """
-    找出标题匹配的所有主题和关键词
-    返回格式: [{"topic": "AI大模型", "matched": ["OpenAI", "ChatGPT"]}, ...]
-    """
-    if not title or not word_groups:
-        return []
-    
-    title_lower = title.lower()
-    
-    # 全局过滤检查
-    if global_filters:
-        for gf in global_filters:
-            if gf.lower() in title_lower:
-                return []
-    
-    # 过滤词检查
-    for fw in filter_words:
-        if fw.lower() in title_lower:
-            return []
-    
-    matched_topics = []
-    
-    for group in word_groups:
-        required_words = group.get("required", [])
-        normal_words = group.get("normal", [])
-        group_key = group.get("group_key", "")
-        
-        # 必须词检查
-        if required_words:
-            all_required = all(rw.lower() in title_lower for rw in required_words)
-            if not all_required:
-                continue
-        
-        # 普通词检查 - 找出所有匹配的词
-        matched_words = []
-        if normal_words:
-            for nw in normal_words:
-                if nw.lower() in title_lower:
-                    matched_words.append(nw)
-            if not matched_words:
-                continue
-        
-        # 添加必须词到匹配列表
-        if required_words:
-            matched_words = required_words + matched_words
-        
-        matched_topics.append({
-            "topic": group_key,
-            "matched": matched_words[:3]  # 最多显示3个匹配词
-        })
-    
-    return matched_topics
-
-
 def parse_index_html():
     """解析 index.html 提取新闻数据"""
     index_file = OUTPUT_DIR / "index.html"
@@ -404,22 +347,24 @@ def parse_index_html():
     # 加载频率词配置
     word_groups, filter_words, global_filters = load_frequency_config()
     
-    # 为 topics 中的新闻添加 matchedTopics，并构建关键词和分类映射
-    topic_keywords = {}  # 主题名 -> 关键词列表
-    topic_categories = {}  # 主题名 -> 分类
-    for group in word_groups:
-        topic_keywords[group["group_key"]] = group.get("normal", []) + group.get("required", [])
-        topic_categories[group["group_key"]] = group.get("category", "其他")
-    
-    for topic in topics:
-        topic_name = topic["name"]
-        topic["keywords"] = topic_keywords.get(topic_name, [])
-        topic["category"] = topic_categories.get(topic_name, "其他")
+    # 构建关键词和分类映射（按索引顺序，因为 HTML 中的主题名可能是关键词拼接）
+    # word_groups 的顺序和 HTML 中的主题顺序一致
+    for i, topic in enumerate(topics):
+        if i < len(word_groups):
+            group = word_groups[i]
+            # 用 frequency_helper 的 group_key 覆盖 HTML 解析的主题名
+            topic["name"] = group["group_key"]
+            topic["keywords"] = group.get("keywords", [])
+            topic["category"] = group.get("category", "其他")
+        else:
+            topic["keywords"] = []
+            topic["category"] = "其他"
+        
+        # 为新闻添加 matchedTopics
         for news in topic.get("news", []):
             title = news.get("_title_for_match", news["title"])
             matched = find_matched_topics(title, word_groups, filter_words, global_filters)
             news["matchedTopics"] = matched
-            # 删除临时字段
             if "_title_for_match" in news:
                 del news["_title_for_match"]
     

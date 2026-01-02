@@ -55,6 +55,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY docker/manage.py .
 COPY docker/api_server.py ./docker/
+COPY docker/frequency_helper.py ./docker/
 COPY docker/app.html ./docker/
 COPY trendradar/ ./trendradar/
 

@@ -222,6 +222,7 @@
         <div class="header-actions">
             <span class="update-time-header">更新: <span id="updateTime">加载中...</span></span>
             <button id="crawlBtn" class="crawl-btn" title="立即爬取新数据">🕷️ 爬取</button>
+            <button id="clearCacheBtn" class="crawl-btn" title="清除服务器缓存" style="background: linear-gradient(135deg, #f97316, #ea580c);">🗑️ 刷新缓存</button>
             <button id="refreshBtn" class="refresh-btn" title="刷新数据">🔄</button>
             <select id="autoRefresh" class="auto-refresh-select">
                 <option value="0">手动刷新</option>
@@ -1313,6 +1314,31 @@ function updateMainTabs() { document.querySelectorAll('.main-tab').forEach(t => 
 function refreshData() { const btn = document.getElementById('refreshBtn'); btn.classList.add('loading'); allNewsData.loaded = false; loadData().finally(() => btn.classList.remove('loading')); }
 function setupAutoRefresh() { const interval = parseInt(document.getElementById('autoRefresh').value) * 1000; if (autoRefreshTimer) clearInterval(autoRefreshTimer); if (interval > 0) autoRefreshTimer = setInterval(refreshData, interval); }
 
+async function clearServerCache() {
+    const btn = document.getElementById('clearCacheBtn');
+    if (btn.classList.contains('loading')) return;
+    const originalText = btn.innerHTML;
+    btn.classList.add('loading');
+    btn.innerHTML = '🗑️ 刷新中...';
+    try {
+        const res = await fetch('/api/refresh');
+        const data = await res.json();
+        btn.classList.remove('loading');
+        btn.innerHTML = originalText;
+        if (data.success) {
+            showToast('缓存已刷新！');
+            allNewsData.loaded = false;
+            await loadData();
+        } else {
+            alert('刷新缓存失败: ' + (data.error || '未知错误'));
+        }
+    } catch (e) {
+        btn.classList.remove('loading');
+        btn.innerHTML = originalText;
+        alert('请求失败: ' + e.message);
+    }
+}
+
 async function triggerCrawl() {
     const btn = document.getElementById('crawlBtn');
     if (btn.classList.contains('loading')) return;
@@ -1349,6 +1375,7 @@ document.querySelectorAll('.main-tab').forEach(tab => tab.addEventListener('clic
 document.getElementById('subTabs').addEventListener('click', e => { if (e.target.classList.contains('sub-tab')) { currentFilter = e.target.dataset.filter; saveStateToHash(); renderSubTabs(); renderView(); } });
 document.getElementById('refreshBtn').addEventListener('click', refreshData);
 document.getElementById('crawlBtn').addEventListener('click', triggerCrawl);
+document.getElementById('clearCacheBtn').addEventListener('click', clearServerCache);
 document.getElementById('autoRefresh').addEventListener('change', setupAutoRefresh);
 window.addEventListener('hashchange', () => { loadStateFromHash(); renderView(); updateMainTabs(); });
 window.addEventListener('resize', () => setTimeout(adjustSingleRowLayout, 100));
